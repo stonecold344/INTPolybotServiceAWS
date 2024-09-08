@@ -48,7 +48,7 @@ jobs:
           debug: true
 
       - name: Update Docker Compose project on EC2
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.1
         with:
           host: ${{ env.EC2_PUBLIC_IP }}
           username: ec2-user
@@ -57,12 +57,12 @@ jobs:
             # Update packages and install dependencies
             sudo yum update -y
             sudo yum install -y jq
-            
+
             # Install Docker and Docker Compose
             sudo yum install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
-            
+
             # Ensure Docker Compose binary is in the PATH
             if ! command -v docker-compose &> /dev/null
             then
@@ -70,16 +70,16 @@ jobs:
               sudo curl -L "https://github.com/docker/compose/releases/download/v2.11.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
               sudo chmod +x /usr/local/bin/docker-compose
             fi
-      
+
             # Ensure the target directory exists
             mkdir -p /home/ec2-user/projects/AWSProject-bennyi/
             cd /home/ec2-user/projects/AWSProject-bennyi/
-      
+
             # Create the .env file with required secrets
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
             echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> .env
             echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> .env
-      
+
             # Start ngrok and save its domain in NGROK_DOMAIN
             if ! command -v ngrok &> /dev/null
             then
@@ -90,10 +90,10 @@ jobs:
             sleep 5  # Wait for ngrok to start
             NGROK_DOMAIN=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "http://localhost:8443")
             echo "TELEGRAM_APP_URL=$NGROK_DOMAIN" >> .env
-      
+
             # Add Docker image names to .env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
-      
+
             # Manage Docker containers
             docker-compose down
             docker-compose up -d
