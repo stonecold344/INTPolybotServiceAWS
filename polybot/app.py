@@ -1,15 +1,20 @@
 import flask
 from flask import request
 import os
+from dotenv import load_dotenv
 from bot import ObjectDetectionBot
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 app = flask.Flask(__name__)
 
 
-# TODO load TELEGRAM_TOKEN value from Secret Manager
-TELEGRAM_TOKEN = ...
-
-TELEGRAM_APP_URL = os.environ['TELEGRAM_APP_URL']
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+YOLO5_URL = os.getenv('YOLO5_URL')
 
 
 @app.route('/', methods=['GET'])
