@@ -7,6 +7,9 @@ on:
     branches:
       - main
 
+env:
+  EC2_PUBLIC_IP: 13.38.59.110  # Replace with your actual EC2 public IP if different
+
 jobs:
   Build:
     runs-on: ubuntu-latest
@@ -14,11 +17,15 @@ jobs:
       - name: Checkout the repo code
         uses: actions/checkout@v2
 
-      - name: Build and push image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image
         run: |
           cd polybot
-          
-          # TODO your implementation here....          
+          docker build -t your-dockerhub-username/polybot:latest .
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push ${{ secrets.DOCKER_USERNAME }}/polybot:latest
 
   Deploy:
     runs-on: ubuntu-latest
@@ -28,7 +35,12 @@ jobs:
     steps:
       - name: Checkout the repo code
         uses: actions/checkout@v2
-      - name: Deploy new version
-        run: |         
-          # TODO your implementation here....     
-     
+
+      - name: Deploy new version to EC2
+        run: |
+          ssh -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
+          docker pull ${{ secrets.DOCKER_USERNAME }}/polybot:latest
+          docker stop polybot || true
+          docker rm polybot || true
+          docker run -d --name polybot ${{ secrets.DOCKER_USERNAME }}/polybot:latest
+          EOF
