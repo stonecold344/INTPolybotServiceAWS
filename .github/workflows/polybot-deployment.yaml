@@ -37,17 +37,45 @@ jobs:
       - name: Checkout the repo code
         uses: actions/checkout@v2
 
-      - name: Prepare SSH key
-        run: |
-          mkdir -p /home/runner/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /home/runner/.ssh/id_rsa
-          chmod 600 /home/runner/.ssh/id_rsa
+      - name: Copy Docker Compose file to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ env.EC2_PUBLIC_IP }}
+          username: ec2-user  # Amazon Linux uses ec2-user
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          source: docker-compose.yaml
+          target: /home/ec2-user/projects/DockerProject-bennyi/
+          debug: true
 
-      - name: Deploy new version to EC2
-        run: |
-          ssh -i /home/runner/.ssh/id_rsa -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
-          docker pull ${{ secrets.DOCKER_USERNAME }}/polybot:latest
-          docker stop polybot || true
-          docker rm polybot || true
-          docker run -d --name polybot ${{ secrets.DOCKER_USERNAME }}/polybot:latest
-          EOF
+      - name: Update Docker Compose project on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.EC2_PUBLIC_IP }}
+          username: ec2-user  # Amazon Linux uses ec2-user
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            sudo yum update -y
+            sudo yum install -y docker-compose jq
+            sudo systemctl start docker
+            sudo systemctl enable docker
+
+            cd /home/ec2-user/projects/DockerProject-bennyi/
+
+            # Create the .env file with required secrets
+            echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
+            echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> .env
+            echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> .env
+
+            # Start ngrok and save its domain in NGROK_DOMAIN
+            ngrok http 8443 --log=stdout > /dev/null &
+            sleep 5  # Wait for ngrok to start
+            NGROK_DOMAIN=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "http://localhost:8443")
+            echo "TELEGRAM_APP_URL=$NGROK_DOMAIN" >> .env
+
+            # Add Docker image names to .env
+            echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
+            echo "YOLO5_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/yolo5:latest" >> .env
+
+            # Start the Docker containers
+            docker-compose down
+            docker-compose up -d
