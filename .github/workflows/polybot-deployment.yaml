@@ -55,12 +55,18 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
             sudo yum update -y
-            sudo yum install -y docker-compose jq
+            sudo yum install -y jq
+            
+            # Install Docker
+            sudo yum install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
             
+            # Install Docker Compose
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.11.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
             
-            mkdir /home/ec2-user/projects/AWSProject-bennyi/
+            mkdir -p /home/ec2-user/projects/AWSProject-bennyi/
             cd /home/ec2-user/projects/AWSProject-bennyi/
 
             # Create the .env file with required secrets
@@ -69,7 +75,7 @@ jobs:
             echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> .env
 
             # Start ngrok and save its domain in NGROK_DOMAIN
-            ngrok http 8443 --log=stdout > /dev/null &
+            nohup ngrok http 8443 --log=stdout > /dev/null &
             sleep 5  # Wait for ngrok to start
             NGROK_DOMAIN=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "http://localhost:8443")
             echo "TELEGRAM_APP_URL=$NGROK_DOMAIN" >> .env
