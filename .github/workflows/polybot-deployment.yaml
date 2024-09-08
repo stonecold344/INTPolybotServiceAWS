@@ -43,7 +43,7 @@ jobs:
           host: ${{ env.EC2_PUBLIC_IP }}
           username: ec2-user  # Amazon Linux uses ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          source: docker-compose.yaml
+          source: polybot/docker-compose.yaml
           target: /home/ec2-user/projects/DockerProject-bennyi/
           debug: true
 
