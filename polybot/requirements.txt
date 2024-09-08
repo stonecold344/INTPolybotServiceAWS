@@ -3,3 +3,9 @@ loguru>=0.7.0
 requests>=2.31.0
 flask>=2.3.2
 matplotlib
+python-dotenv
+pymongo
+boto3
+mongo-tools
+requests
+uuid
