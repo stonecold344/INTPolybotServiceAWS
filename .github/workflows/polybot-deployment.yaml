@@ -56,46 +56,44 @@ jobs:
           script: |
             # Update packages and install dependencies
             sudo yum update -y
-            sudo yum install -y jq curl
-
-            # Install Docker
+            sudo yum install -y jq
+            
+            # Install Docker and Docker Compose
             sudo yum install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
-
-            # Install Docker Compose
+            
+            # Ensure Docker Compose binary is in the PATH
             if ! command -v docker-compose &> /dev/null
             then
               echo "Docker Compose not found, installing..."
               sudo curl -L "https://github.com/docker/compose/releases/download/v2.11.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
               sudo chmod +x /usr/local/bin/docker-compose
             fi
-
+      
             # Ensure the target directory exists
             mkdir -p /home/ec2-user/projects/AWSProject-bennyi/
             cd /home/ec2-user/projects/AWSProject-bennyi/
-
+      
             # Create the .env file with required secrets
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
             echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> .env
             echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> .env
-
-            # Install ngrok
+      
+            # Start ngrok and save its domain in NGROK_DOMAIN
             if ! command -v ngrok &> /dev/null
             then
               echo "ngrok not found, installing..."
               sudo curl -s https://ngrok.com/download | sudo tar xz -C /usr/local/bin
             fi
-
-            # Start ngrok and save its domain in NGROK_DOMAIN
             nohup ngrok http 8443 --log=stdout > /dev/null &
             sleep 5  # Wait for ngrok to start
             NGROK_DOMAIN=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "http://localhost:8443")
             echo "TELEGRAM_APP_URL=$NGROK_DOMAIN" >> .env
-
+      
             # Add Docker image names to .env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
-
+      
             # Manage Docker containers
             docker-compose down
             docker-compose up -d
