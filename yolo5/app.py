@@ -1,60 +1,102 @@
 import time
 from pathlib import Path
-from detect import run
 import yaml
 from loguru import logger
 import os
 import boto3
+import requests
+import json
+from flask import Flask, request, jsonify
+import uuid
+from botocore.exceptions import NoCredentialsError, ClientError
+from dotenv import load_dotenv
+from detect import run
 
-images_bucket = os.environ['BUCKET_NAME']
-queue_name = os.environ['SQS_QUEUE_NAME']
 
-sqs_client = boto3.client('sqs', region_name='YOUR_REGION_HERE')
+# Initialize S3, SQS, and DynamoDB clients
+SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME')
+AWS_REGION = os.getenv('AWS_REGION')
+polybot_url = os.getenv('POLYBOT_URL')
+DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+
+sqs_client = boto3.client('sqs', region_name=AWS_REGION)
+s3_client = boto3.client('s3', region_name=AWS_REGION)
+dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
+table = dynamodb_client.Table(DYNAMODB_TABLE)
+s3_folder_path = 'aws-project'
 
 with open("data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
 
+def download_image_from_s3(img_name):
+    """Downloads an image from the S3 bucket."""
+    local_img_path = f"images/{img_name}"
+    s3_client.download_file(S3_BUCKET_NAME, img_name, local_img_path)
+    return local_img_path
+
+def upload_image_to_s3(img_path, img_name):
+    """Uploads an image to the S3 bucket."""
+    s3_client.upload_file(img_path, S3_BUCKET_NAME, img_name)
+    logger.info(f"Uploaded {img_name} to S3 bucket {S3_BUCKET_NAME}")
+
+def store_prediction_in_dynamodb(prediction_summary):
+    """Stores the prediction summary in DynamoDB."""
+    table.put_item(Item=prediction_summary)
+    logger.info(f"Stored prediction {prediction_summary['prediction_id']} in DynamoDB")
+
+def notify_polybot(prediction_id):
+    """Notifies Polybot of the prediction completion."""
+    url = f"{polybot_url}/results?predictionId={prediction_id}"
+    response = requests.get(url)
+    logger.info(f"Notified Polybot of prediction {prediction_id}: {response.status_code}")
 
 def consume():
     while True:
-        response = sqs_client.receive_message(QueueUrl=queue_name, MaxNumberOfMessages=1, WaitTimeSeconds=5)
+        response = sqs_client.receive_message(QueueUrl=SQS_QUEUE_NAME, MaxNumberOfMessages=1, WaitTimeSeconds=5)
 
         if 'Messages' in response:
-            message = response['Messages'][0]['Body']
+            message = json.loads(response['Messages'][0]['Body'])
             receipt_handle = response['Messages'][0]['ReceiptHandle']
 
             # Use the ReceiptHandle as a prediction UUID
             prediction_id = response['Messages'][0]['MessageId']
+            img_name = message['img_name']
+            chat_id = message['chat_id']
 
-            logger.info(f'prediction: {prediction_id}. start processing')
+            logger.info(f'Prediction {prediction_id} started for image {img_name}')
 
-            # Receives a URL parameter representing the image to download from S3
-            img_name = ...  # TODO extract from `message`
-            chat_id = ...  # TODO extract from `message`
-            original_img_path = ...  # TODO download img_name from S3, store the local image path in original_img_path
+            # Download the image from S3
+            original_img_path = download_image_from_s3(img_name)
+            logger.info(f'Image {img_name} downloaded from S3 to {original_img_path}')
 
-            logger.info(f'prediction: {prediction_id}/{original_img_path}. Download img completed')
+            # Run YOLOv5 for object detection
+            try:
+                run(
+                    weights='yolov5s.pt',
+                    data='data/coco128.yaml',
+                    source=original_img_path,
+                    project='static/data',
+                    name=prediction_id,
+                    save_txt=True,
+                    exist_ok=True
+                )
+                logger.info(f'YOLOv5 completed processing for {original_img_path}')
+            except Exception as e:
+                logger.error(f'Error during YOLOv5 inference: {e}')
+                return {'error': f'Error during YOLOv5 inference: {e}'}, 500
 
-            # Predicts the objects in the image
-            run(
-                weights='yolov5s.pt',
-                data='data/coco128.yaml',
-                source=original_img_path,
-                project='static/data',
-                name=prediction_id,
-                save_txt=True
-            )
 
-            logger.info(f'prediction: {prediction_id}/{original_img_path}. done')
+            logger.info(f'Prediction {prediction_id} completed')
 
-            # This is the path for the predicted image with labels
-            # The predicted image typically includes bounding boxes drawn around the detected objects, along with class labels and possibly confidence scores.
+            # Path for the predicted image and label file
             predicted_img_path = Path(f'static/data/{prediction_id}/{original_img_path}')
+            pred_summary_path = Path(f'static/data/{prediction_id}/labels/{original_img_path.split(".")[0]}.txt')
 
-            # TODO Uploads the predicted image (predicted_img_path) to S3 (be careful not to override the original image).
+            # Upload the predicted image to S3
+            upload_image_to_s3(predicted_img_path, f"predictions/{prediction_id}/{img_name}")
 
             # Parse prediction labels and create a summary
-            pred_summary_path = Path(f'static/data/{prediction_id}/labels/{original_img_path.split(".")[0]}.txt')
             if pred_summary_path.exists():
                 with open(pred_summary_path) as f:
                     labels = f.read().splitlines()
@@ -67,22 +109,25 @@ def consume():
                         'height': float(l[4]),
                     } for l in labels]
 
-                logger.info(f'prediction: {prediction_id}/{original_img_path}. prediction summary:\n\n{labels}')
+                logger.info(f'Prediction summary for {prediction_id}: {labels}')
 
                 prediction_summary = {
                     'prediction_id': prediction_id,
                     'original_img_path': original_img_path,
-                    'predicted_img_path': predicted_img_path,
+                    'predicted_img_path': str(predicted_img_path),
                     'labels': labels,
+                    'chat_id': chat_id,
                     'time': time.time()
                 }
 
-                # TODO store the prediction_summary in a DynamoDB table
-                # TODO perform a GET request to Polybot to `/results` endpoint
+                # Store the prediction in DynamoDB
+                store_prediction_in_dynamodb(prediction_summary)
 
-            # Delete the message from the queue as the job is considered as DONE
-            sqs_client.delete_message(QueueUrl=queue_name, ReceiptHandle=receipt_handle)
+                # Notify Polybot about the results
+                notify_polybot(prediction_id)
 
+            # Delete the message from the SQS queue
+            sqs_client.delete_message(QueueUrl=SQS_QUEUE_NAME, ReceiptHandle=receipt_handle)
 
 if __name__ == "__main__":
     consume()
