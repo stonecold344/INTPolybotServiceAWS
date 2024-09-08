@@ -6,6 +6,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 ENV AWS_REGION='eu-west-3'
 ENV DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'
+ENV TELEGRAM_TOKEN='6629220970:AAFUHIrGYAZh8RSvIAAl8HmE3q52JxwKm34'
 COPY . .
 
 CMD ["python", "app.py"]
