@@ -34,9 +34,15 @@ jobs:
       - name: Checkout the repo code
         uses: actions/checkout@v2
 
+      - name: Prepare SSH key
+        run: |
+          mkdir -p /home/runner/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /home/runner/.ssh/id_rsa
+          chmod 600 /home/runner/.ssh/id_rsa
+
       - name: Deploy new version to EC2
         run: |
-          ssh -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
+          ssh -i /home/runner/.ssh/id_rsa ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
           docker pull ${{ secrets.DOCKER_USERNAME }}/yolo5:latest
           docker stop yolo5 || true
           docker rm yolo5 || true
