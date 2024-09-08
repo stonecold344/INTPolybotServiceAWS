@@ -44,7 +44,7 @@ jobs:
           username: ec2-user  # Amazon Linux uses ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           source: polybot/docker-compose.yaml
-          target: /home/ec2-user/projects/DockerProject-bennyi/
+          target: /home/ec2-user/projects/AWSProject-bennyi
           debug: true
 
       - name: Update Docker Compose project on EC2
@@ -58,8 +58,10 @@ jobs:
             sudo yum install -y docker-compose jq
             sudo systemctl start docker
             sudo systemctl enable docker
-
-            cd /home/ec2-user/projects/DockerProject-bennyi/
+            
+            
+            mkdir /home/ec2-user/projects/AWSProject-bennyi/
+            cd /home/ec2-user/projects/AWSProject-bennyi/
 
             # Create the .env file with required secrets
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
@@ -74,7 +76,6 @@ jobs:
 
             # Add Docker image names to .env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
-            echo "YOLO5_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/yolo5:latest" >> .env
 
             # Start the Docker containers
             docker-compose down
