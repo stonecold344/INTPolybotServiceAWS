@@ -42,7 +42,7 @@ jobs:
 
       - name: Deploy new version to EC2
         run: |
-          ssh -i /home/runner/.ssh/id_rsa ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
+          ssh -i /home/runner/.ssh/id_rsa  -o StrictHostKeyChecking=no  ec2-user@${{ env.EC2_PUBLIC_IP }} << 'EOF'
           docker pull ${{ secrets.DOCKER_USERNAME }}/yolo5:latest
           docker stop yolo5 || true
           docker rm yolo5 || true
