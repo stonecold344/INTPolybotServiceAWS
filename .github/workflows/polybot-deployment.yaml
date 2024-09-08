@@ -78,5 +78,5 @@ jobs:
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
 
             # Start the Docker containers
-            docker-compose down
-            docker-compose up -d
+            docker down
+            docker run -d
