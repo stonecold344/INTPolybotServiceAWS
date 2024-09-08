@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IP: 15.236.39.168  # Replace with your actual EC2 public IP if different
+  EC2_PUBLIC_IP: 15.237.174.131  # Replace with your actual EC2 public IP if different
 
 jobs:
   Build:
@@ -55,11 +55,11 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
             # Update packages and install dependencies
-            sudo yum update -y
-            sudo yum install -y jq
+            sudo apt-get update -y
+            sudo apt-get install -y jq curl
 
             # Install Docker and Docker Compose
-            sudo yum install -y docker
+            sudo apt-get install -y docker.io
             sudo systemctl start docker
             sudo systemctl enable docker
 
