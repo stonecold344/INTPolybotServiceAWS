@@ -2,8 +2,6 @@ name: Yolo5 Microservice Deployment
 
 on:
   push:
-    paths:
-      - 'yolo5/**'
     branches:
       - main
 
