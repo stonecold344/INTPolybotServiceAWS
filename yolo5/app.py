@@ -6,12 +6,9 @@ import os
 import boto3
 import requests
 import json
-from flask import Flask, request, jsonify
-import uuid
-from botocore.exceptions import NoCredentialsError, ClientError
 from dotenv import load_dotenv
-from detect import run
 
+load_dotenv()
 
 # Initialize S3, SQS, and DynamoDB clients
 SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME')
@@ -19,6 +16,7 @@ AWS_REGION = os.getenv('AWS_REGION')
 polybot_url = os.getenv('POLYBOT_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+
 
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
 s3_client = boto3.client('s3', region_name=AWS_REGION)
