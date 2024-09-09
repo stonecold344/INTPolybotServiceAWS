@@ -24,8 +24,8 @@ jobs:
       - name: Build and push Docker image
         run: |
           cd polybot
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/polybot:latest .
-          docker push ${{ secrets.DOCKER_USERNAME }}/polybot:latest
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}
 
   Deploy:
     runs-on: ubuntu-latest
@@ -70,10 +70,17 @@ jobs:
               sudo chmod +x /usr/local/bin/docker-compose
             fi
 
-            # Ensure the target directory exists
-            mkdir -p /home/ubuntu/projects/AWSProject-bennyi/polybot
+            # Create the .env file with required secrets
+            echo "TELEGRAM_TOKEN='6629220970:AAFUHIrGYAZh8RSvIAAl8HmE3q52JxwKm34'" > /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "S3_BUCKET_NAME='bennyi-aws-s3-bucket'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "TELEGRAM_APP_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "POLYBOT_IMG_NAME=${{ secrets.DOCKERHUB_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "AWS_REGION='eu-west-3'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
 
             # Manage Docker containers
             cd /home/ubuntu/projects/AWSProject-bennyi/polybot
             docker-compose down
             docker-compose up -d
+
