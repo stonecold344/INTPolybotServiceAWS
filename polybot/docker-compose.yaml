@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   polybot:
-    image: polybot:latest
+    image: ${POLYBOT_IMG_NAME}
     container_name: polybot
     environment:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       YOLO5_URL: http://yolo5:8081
-      TELEGRAM_APP_URL : ${TELEGRAM_APP_URL}
+      TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
