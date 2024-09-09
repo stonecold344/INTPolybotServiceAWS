@@ -1,4 +1,4 @@
-name: Polybot Service Deployment
+name: Polybot Microservice Deployment
 
 on:
   push:
@@ -6,33 +6,32 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IP: 15.236.19.23  # Replace with your actual EC2 public IP
+  EC2_PUBLIC_IP: 15.237.174.131  # Replace with your actual EC2 public IP if different
 
 jobs:
-  PolybotBuild:
+  Build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo code
         uses: actions/checkout@v2
 
-      - name: Log in to DockerHub
-        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Build and push Polybot image
+      - name: Log in to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and push Docker image
         run: |
           cd polybot
-          IMAGE_NAME=${{ secrets.DOCKERHUB_USERNAME }}/polybot:${{ github.run_number }}
-          docker build -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/polybot:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/polybot:latest
 
   Deploy:
-    name: Deploy Docker compose project
     runs-on: ubuntu-latest
     needs:
-      - PolybotBuild
+      - Build
 
     steps:
       - name: Checkout the repo code
@@ -44,37 +43,57 @@ jobs:
           host: ${{ env.EC2_PUBLIC_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          source: docker-compose.yaml
-          target: /home/ubuntu/projects/DockerProject-bennyi/
+          source: polybot/docker-compose.yaml
+          target: /home/ubuntu/projects/AWSProject-bennyi
           debug: true
 
       - name: Update Docker Compose project on EC2
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.1
         with:
           host: ${{ env.EC2_PUBLIC_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          key_passphrase: ""  # If your key has no passphrase
-          port: 22
           script: |
-            sudo apt update
-            sudo apt install -y docker-compose jq ngrok
+            # Update packages and install dependencies
+            sudo apt-get update -y
+            sudo apt-get install -y jq curl
 
-            cd /home/ubuntu/projects/DockerProject-bennyi/
+            # Install Docker and Docker Compose
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+
+            # Ensure Docker Compose binary is in the PATH
+            if ! command -v docker-compose &> /dev/null
+            then
+              echo "Docker Compose not found, installing..."
+              sudo curl -L "https://github.com/docker/compose/releases/download/v2.11.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+
+            # Ensure the target directory exists
+            mkdir -p /home/ubuntu/projects/AWSProject-bennyi/
+            cd /home/ubuntu/projects/AWSProject-bennyi/
 
             # Create the .env file with required secrets
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
             echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> .env
+            echo "YOLO5_URL=${{ secrets.YOLO5_URL }}" >> .env
 
             # Start ngrok and save its domain in NGROK_DOMAIN
-            ngrok http 8443 --log=stdout > /dev/null &
+            if ! command -v ngrok &> /dev/null
+            then
+              echo "ngrok not found, installing..."
+              sudo curl -s https://ngrok.com/download | sudo tar xz -C /usr/local/bin
+            fi
+            nohup ngrok http 8443 --log=stdout > /dev/null &
             sleep 5  # Wait for ngrok to start
             NGROK_DOMAIN=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "http://localhost:8443")
             echo "TELEGRAM_APP_URL=$NGROK_DOMAIN" >> .env
 
-            # Add Docker image name to .env
-            echo "POLYBOT_IMG_NAME=${{ secrets.DOCKERHUB_USERNAME }}/polybot:${{ github.run_number }}" >> .env
+            # Add Docker image names to .env
+            echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:latest" >> .env
 
-            # Start the Docker containers
+            # Manage Docker containers
             docker-compose down
             docker-compose up -d
