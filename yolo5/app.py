@@ -7,6 +7,7 @@ import boto3
 import requests
 import json
 from dotenv import load_dotenv
+from yolov5 import run  # Ensure that yolov5 is properly imported and available
 
 load_dotenv()
 
@@ -16,7 +17,6 @@ AWS_REGION = os.getenv('AWS_REGION')
 polybot_url = os.getenv('POLYBOT_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-
 
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
 s3_client = boto3.client('s3', region_name=AWS_REGION)
@@ -83,7 +83,6 @@ def consume():
             except Exception as e:
                 logger.error(f'Error during YOLOv5 inference: {e}')
                 return {'error': f'Error during YOLOv5 inference: {e}'}, 500
-
 
             logger.info(f'Prediction {prediction_id} completed')
 

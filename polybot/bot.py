@@ -1,7 +1,6 @@
 import telebot
 from loguru import logger
 import os
-import time
 import boto3
 from telebot.types import InputFile
 
@@ -9,7 +8,6 @@ class Bot:
     def __init__(self, token, telegram_chat_url):
         self.telegram_bot_client = telebot.TeleBot(token)
         self.telegram_bot_client.remove_webhook()
-        time.sleep(0.5)
         self.telegram_bot_client.set_webhook(url=f'{telegram_chat_url}/{token}/', timeout=60)
         logger.info(f'Telegram Bot information\n\n{self.telegram_bot_client.get_me()}')
 
@@ -31,9 +29,10 @@ class Bot:
         folder_name = file_info.file_path.split('/')[0]
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
-        with open(file_info.file_path, 'wb') as photo:
+        file_path = os.path.join(folder_name, os.path.basename(file_info.file_path))
+        with open(file_path, 'wb') as photo:
             photo.write(data)
-        return file_info.file_path
+        return file_path
 
     def send_photo(self, chat_id, img_path):
         if not os.path.exists(img_path):
@@ -42,24 +41,35 @@ class Bot:
 
     def handle_message(self, msg):
         logger.info(f'Incoming message: {msg}')
-        self.send_text(msg['chat']['id'], f'Your original message: {msg["text"]}')
+        if 'text' in msg:
+            self.send_text(msg['chat']['id'], f'Your original message: {msg["text"]}')
 
 class ObjectDetectionBot(Bot):
-    def __init__(self, token, telegram_chat_url, bucket_name, queue_url):
+    def __init__(self, token, telegram_chat_url, bucket_name, yolo5_url, sqs_queue_url):
         super().__init__(token, telegram_chat_url)
         self.s3_client = boto3.client('s3')
         self.sqs_client = boto3.client('sqs')
+        self.yolo5_url = yolo5_url
         self.bucket_name = bucket_name
-        self.queue_url = queue_url
+        self.sqs_queue_url = sqs_queue_url
 
     def handle_message(self, msg):
-        logger.info(f'Incoming message: {msg}')
+        logger.info(f'Handling message: {msg}')
         if self.is_current_msg_photo(msg):
-            photo_path = self.download_user_photo(msg)
-            img_name = os.path.basename(photo_path)
-            self.s3_client.upload_file(photo_path, self.bucket_name, img_name)
-            logger.info(f"Uploaded {img_name} to S3 bucket {self.bucket_name}")
-            message_body = {"chat_id": msg['chat']['id'], "img_name": img_name}
-            self.sqs_client.send_message(QueueUrl=self.queue_url, MessageBody=str(message_body))
-            logger.info(f"Sent message to SQS queue {self.queue_url}")
-            self.send_text(msg['chat']['id'], "Your image is being processed. Please wait...")
+            try:
+                photo_path = self.download_user_photo(msg)
+                img_name = os.path.basename(photo_path)
+                self.s3_client.upload_file(photo_path, self.bucket_name, img_name)
+                logger.info(f"Uploaded {img_name} to S3 bucket {self.bucket_name}")
+
+                # Send message to SQS queue
+                message_body = {
+                    "chat_id": msg['chat']['id'],
+                    "img_name": img_name
+                }
+                self.sqs_client.send_message(QueueUrl=self.sqs_queue_url, MessageBody=json.dumps(message_body))
+
+                self.send_text(msg['chat']['id'], "Your image is being processed. Please wait...")
+            except Exception as e:
+                logger.error(f"Error handling photo message: {e}")
+                self.send_text(msg['chat']['id'], "An error occurred while processing your photo.")
