@@ -40,14 +40,8 @@ jobs:
       - Build
 
     steps:
-      - name: Prepare SSH key
-        run: |
-          mkdir -p /home/runner/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /home/runner/.ssh/id_rsa
-          chmod 600 /home/runner/.ssh/id_rsa
-
-      - name: List contents of yolo5 directory
-        run: ls -la
+      - name: Checkout the repo code
+        uses: actions/checkout@v2
 
       - name: Copy the entire yolo5 directory to EC2
         uses: appleboy/scp-action@master
