@@ -3,6 +3,9 @@ pyyaml
 loguru
 python-dotenv
 boto3
+pymongo
+mongo-tools
+torch
 numpy
 opencv-python
 ultralytics
