@@ -39,6 +39,7 @@ SQS_QUEUE_URL = os.getenv('SQS_URL')
 
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_QUEUE_URL]):
+    print(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_QUEUE_URL)
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
