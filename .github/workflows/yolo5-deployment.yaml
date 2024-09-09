@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IP: 15.236.204.154
+  EC2_PUBLIC_IP: 15.237.124.178
 
 jobs:
   Build:
