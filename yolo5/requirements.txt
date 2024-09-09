@@ -20,4 +20,3 @@ yolov5
 bson
 botocore
 yolov5
-openssh-server

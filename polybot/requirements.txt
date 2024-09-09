@@ -11,4 +11,3 @@ requests
 uuid
 docker
 docker-compose
-openssh-server
