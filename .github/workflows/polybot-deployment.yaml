@@ -44,7 +44,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           source: polybot/docker-compose.yaml
-          target: ~/projects/AWSProject-bennyi
+          target: /home/ubuntu/projects/AWSProject-bennyi
           debug: true
 
       - name: Update Docker Compose project on EC2
@@ -72,8 +72,8 @@ jobs:
             fi
 
             # Ensure the target directory exists
-            mkdir -p /projects/AWSProject-bennyi/
-            cd /projects/AWSProject-bennyi/
+            mkdir -p /home/ubuntu/projects/AWSProject-bennyi/
+            cd /home/ubuntu/projects/AWSProject-bennyi/
 
             # Create the .env file with required secrets
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
