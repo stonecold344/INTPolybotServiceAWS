@@ -7,6 +7,10 @@ import json
 import requests
 
 
+
+env_path = Path('/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
+load_dotenv(dotenv_path=env_path)
+
 app = flask.Flask(__name__)
 
 def get_secret(secret_id):
