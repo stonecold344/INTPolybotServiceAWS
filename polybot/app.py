@@ -5,6 +5,7 @@ import boto3
 from bot import ObjectDetectionBot
 import json
 import requests
+from dotenv import load_dotenv
 
 
 
