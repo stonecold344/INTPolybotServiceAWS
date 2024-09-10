@@ -55,23 +55,95 @@ class ObjectDetectionBot(Bot):
         self.bucket_name = bucket_name
         self.sqs_queue_url = sqs_queue_url
 
+        logger.info("ObjectDetectionBot initialized.")
+
+    def upload_to_s3(self, file_path):
+        file_name = os.path.basename(file_path)
+        unique_id = uuid.uuid4()
+        object_name = f'docker-project/photos_{unique_id}_{file_name}'
+
+        try:
+            logger.info(f'Uploading file to S3: {file_path}')
+            self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
+
+            # Retry checking for file on S3
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
+                if 'Contents' in response:
+                    logger.info("File is available on S3")
+                    return object_name
+                else:
+                    logger.info(f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt+1}/{max_attempts})")
+                    time.sleep(5)
+            else:
+                raise TimeoutError("File upload timeout. Could not find file after 10 attempts.")
+
+        except Exception as e:
+            logger.error(f"Error uploading to S3: {e}")
+            raise
+
+    def request_yolo5_predictions(self, image_url):
+        try:
+            response = requests.post(self.yolo5_url, json={'image_url': image_url})
+            response.raise_for_status()
+            predictions = response.json()
+            logger.info(f"Predictions received: {predictions}")
+            return predictions
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error requesting YOLO5 predictions: {e}")
+            return {}
+
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
-        if self.is_current_msg_photo(msg):
-            try:
-                photo_path = self.download_user_photo(msg)
-                img_name = os.path.basename(photo_path)
-                self.s3_client.upload_file(photo_path, self.bucket_name, img_name)
-                logger.info(f"Uploaded {img_name} to S3 bucket {self.bucket_name}")
+        chat_id = msg['chat']['id']
 
-                # Send message to SQS queue
-                message_body = {
-                    "chat_id": msg['chat']['id'],
-                    "img_name": img_name
-                }
-                self.sqs_client.send_message(QueueUrl=self.sqs_queue_url, MessageBody=json.dumps(message_body))
+        if 'text' in msg:
+            text = msg['text']
+            logger.info(f'Received text message: {text}')
+            if text.startswith('/predict'):
+                self.pending_prediction[chat_id] = True
+                self.send_text(chat_id, 'Please send a photo to analyze.')
+                logger.info(f'Set pending_prediction for chat_id {chat_id} to True')
+            else:
+                self.send_text(chat_id, 'Unsupported command. Please use the /predict command with a photo.')
 
-                self.send_text(msg['chat']['id'], "Your image is being processed. Please wait...")
-            except Exception as e:
-                logger.error(f"Error handling photo message: {e}")
-                self.send_text(msg['chat']['id'], "An error occurred while processing your photo.")
+        elif self.is_current_msg_photo(msg):
+            logger.info(f'Received photo message for chat_id {chat_id}')
+            logger.info(msg)
+            if self.pending_prediction.get(chat_id, False):
+                try:
+                    photo_path = self.download_user_photo(msg)
+                    logger.info(f'Photo downloaded to: {photo_path}')
+
+                    photo_name = self.upload_to_s3(photo_path)
+                    logger.info(f'Photo uploaded to S3 with name: {photo_name}')
+
+                    photo_url = f'https://{self.s3_bucket_name}.s3.{self.s3_region}.amazonaws.com/{photo_name}'
+                    logger.info(f'Photo URL: {photo_url}')
+
+                    predictions = self.request_yolo5_predictions(photo_url)
+                    logger.info(f'Predictions received: {predictions}')
+
+                    if predictions:
+                        prediction_text = ""
+                        for obj, conf in predictions.items():
+                            prediction_text += f"{obj}: {conf}\n"
+                    else:
+                        prediction_text = "No predictions were returned."
+
+                    self.send_text(chat_id, prediction_text)
+                    logger.info(f'Sent prediction result to chat_id {chat_id}')
+
+                    # Reset the pending state after processing
+                    self.pending_prediction[chat_id] = False
+                    logger.info(f'Reset pending_prediction for chat_id {chat_id}')
+                except Exception as e:
+                    logger.error(f"Error processing photo message: {e}")
+                    self.send_text(chat_id, f"An error occurred: {e}")
+            else:
+                self.send_text(chat_id, 'Please use the /predict command to analyze this photo.')
+                logger.info(f'No pending prediction for chat_id {chat_id}.')
+        else:
+            self.send_text(chat_id, 'Unsupported command or message.')
+            logger.info(f'Unsupported message type for chat_id {chat_id}.')
