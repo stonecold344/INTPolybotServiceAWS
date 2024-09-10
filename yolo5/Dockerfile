@@ -8,6 +8,8 @@ RUN apt-get update && \
     apt-get install -y git curl && \
     pip install --upgrade pip
 
+
+
 # Clone YOLOv5 repository
 RUN git clone https://github.com/ultralytics/yolov5.git
 WORKDIR /usr/src/app/yolov5
