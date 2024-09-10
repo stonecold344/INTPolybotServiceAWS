@@ -74,7 +74,7 @@ jobs:
             echo "TELEGRAM_TOKEN='6629220970:AAFUHIrGYAZh8RSvIAAl8HmE3q52JxwKm34'" > /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "YOLO5_URL=YOLO5_URL='http://yolo5:8081'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "S3_BUCKET_NAME='bennyi-aws-s3-bucket'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-            echo "TELEGRAM_APP_URL='https://aws-polybot-lb-bennyi-1016622634.eu-west-3.elb.amazonaws.com'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "TELEGRAM_APP_URL='curl -Iv https://aws-domain-bennyi.int-devops.click'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "YOLO5_IMG_NAME=yolo5:v1" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
