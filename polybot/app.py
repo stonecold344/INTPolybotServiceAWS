@@ -8,8 +8,7 @@ import requests
 
 
 
-env_path = Path('/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path='/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
 
 app = flask.Flask(__name__)
 
