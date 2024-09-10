@@ -78,7 +78,7 @@ jobs:
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "YOLO5_IMG_NAME=yolo5:v1" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-            echo "AWS_REGION=eu-west-3" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "AWS_REGION='eu-west-3'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "SQS_URL='https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
 
 
