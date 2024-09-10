@@ -2,13 +2,10 @@ import flask
 from flask import request, jsonify
 import os
 import boto3
-from dotenv import load_dotenv
 from bot import ObjectDetectionBot
 import json
 import requests
 
-# Load environment variables from .env file
-load_dotenv()
 
 app = flask.Flask(__name__)
 
