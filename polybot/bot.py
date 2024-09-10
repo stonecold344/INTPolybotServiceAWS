@@ -45,10 +45,10 @@ class Bot:
             self.send_text(msg['chat']['id'], f'Your original message: {msg["text"]}')
 
 class ObjectDetectionBot(Bot):
-    def __init__(self, token, telegram_chat_url, bucket_name, yolo5_url, sqs_queue_url):
+    def __init__(self, token, telegram_chat_url, bucket_name, yolo5_url, sqs_queue_url, aws_region):
         super().__init__(token, telegram_chat_url)
-        self.s3_client = boto3.client('s3')
-        self.sqs_client = boto3.client('sqs')
+        self.sqs_client = boto3.client('sqs', region_name=aws_region)
+        self.s3_client = boto3.client('s3', region_name=aws_region)
         self.yolo5_url = yolo5_url
         self.bucket_name = bucket_name
         self.sqs_queue_url = sqs_queue_url

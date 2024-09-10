@@ -49,7 +49,7 @@ dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
-bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, SQS_URL)
+bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
 
 def set_webhook():
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
