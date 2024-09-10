@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 
 load_dotenv(dotenv_path='/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
+print("Env file loaded")
 
 app = flask.Flask(__name__)
 
@@ -37,7 +38,12 @@ YOLO5_URL = os.getenv('YOLO5_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
-
+print(f"TELEGRAM_APP_URL: {TELEGRAM_APP_URL}")
+print(f"S3_BUCKET_NAME: {S3_BUCKET_NAME}")
+print(f"YOLO5_URL: {YOLO5_URL}")
+print(f"DYNAMODB_TABLE: {DYNAMODB_TABLE}")
+print(f"AWS_REGION: {AWS_REGION}")
+print(f"SQS_URL: {SQS_URL}")
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     print(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL)
