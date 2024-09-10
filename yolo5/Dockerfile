@@ -3,9 +3,9 @@ FROM python:3.11-slim
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Install git and other dependencies
+# Install git and curl
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y git curl && \
     pip install --upgrade pip
 
 # Clone YOLOv5 repository
