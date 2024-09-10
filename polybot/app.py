@@ -6,13 +6,16 @@ from bot import ObjectDetectionBot
 import json
 import requests
 from dotenv import load_dotenv
+import logging
 
-
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_dotenv(dotenv_path='/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
-print("Env file loaded")
+logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
+
 
 def get_secret(secret_id):
     session = boto3.session.Session()
@@ -23,8 +26,9 @@ def get_secret(secret_id):
         secret = get_secret_value_response['SecretString']
         return json.loads(secret)
     except Exception as e:
-        print(f"Error retrieving secret: {e}")
+        logging.error(f"Error retrieving secret: {e}")
         raise e
+
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -41,7 +45,8 @@ SQS_URL = os.getenv('SQS_URL')
 
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
-    print(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL)
+    logging.error(
+        f"Missing environment variables: {TELEGRAM_TOKEN}, {TELEGRAM_APP_URL}, {S3_BUCKET_NAME}, {YOLO5_URL}, {DYNAMODB_TABLE}, {AWS_REGION}, {SQS_URL}")
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
@@ -51,25 +56,59 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # Define bot object globally
 bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
 
-def set_webhook():
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
-    response = requests.post(url, data={"url": f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"})
-    print("Set webhook response:", response.json())
 
+def set_webhook():
+    try:
+        # Get current webhook info
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
+        response = requests.get(url)
+        webhook_info = response.json()
+        logging.info("Webhook info: %s", webhook_info)
+
+        # Check if webhook is already set to the correct URL
+        current_url = webhook_info['result'].get('url', None)
+        desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
+
+        if current_url == desired_url:
+            logging.info("Webhook is already set to the desired URL: %s", current_url)
+            return
+        else:
+            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s",
+                         current_url)
+
+        # Set webhook if not already set or has a different URL
+        set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+        response = requests.post(set_url, data={"url": desired_url})
+        result = response.json()
+        logging.info("Set webhook response: %s", result)
+
+        if result.get('ok'):
+            logging.info("Webhook set successfully")
+        else:
+            logging.error("Failed to set webhook: %s", result)
+
+    except Exception as e:
+        logging.error(f"Error in setting webhook: {e}")
+        raise e
+
+
+# Function to get webhook info
 def get_webhook_info():
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
     response = requests.get(url)
-    print("Webhook info:", response.json())
+    logging.info("Webhook info: %s", response.json())
 
 @app.route('/', methods=['GET'])
 def index():
     return 'Ok'
+
 
 @app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
 def webhook():
     req = request.get_json()
     bot.handle_message(req.get('message', {}))
     return 'Ok'
+
 
 @app.route('/results', methods=['POST'])
 def results():
@@ -90,13 +129,18 @@ def results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/loadTest/', methods=['POST'])
 def load_test():
     req = request.get_json()
     bot.handle_message(req.get('message', {}))
     return 'Ok'
 
+
 if __name__ == "__main__":
-    set_webhook()
-    get_webhook_info()
+    try:
+        set_webhook()
+        get_webhook_info()
+    except Exception as e:
+        logging.error(f"Error setting or getting webhook: {e}")
     app.run(host='0.0.0.0', port=8443)
