@@ -76,6 +76,8 @@ def set_webhook():
             logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s",
                          current_url)
 
+
+
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
         response = requests.post(set_url, data={"url": desired_url})
