@@ -1,5 +1,8 @@
 import json
+import time
+import uuid
 
+import requests
 import telebot
 from loguru import logger
 import os
@@ -49,12 +52,13 @@ class Bot:
 class ObjectDetectionBot(Bot):
     def __init__(self, token, telegram_chat_url, bucket_name, yolo5_url, aws_region, sqs_queue_url):
         super().__init__(token, telegram_chat_url)
+        self.pending_prediction = {}
         self.sqs_client = boto3.client('sqs', region_name=aws_region)
         self.s3_client = boto3.client('s3', region_name=aws_region)
         self.yolo5_url = yolo5_url
         self.bucket_name = bucket_name
         self.sqs_queue_url = sqs_queue_url
-
+        self.aws_region = aws_region
         logger.info("ObjectDetectionBot initialized.")
 
     def upload_to_s3(self, file_path):
@@ -64,12 +68,12 @@ class ObjectDetectionBot(Bot):
 
         try:
             logger.info(f'Uploading file to S3: {file_path}')
-            self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
+            self.s3_client.upload_file(file_path, self.bucket_name, object_name)
 
             # Retry checking for file on S3
             max_attempts = 10
             for attempt in range(max_attempts):
-                response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
+                response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=object_name)
                 if 'Contents' in response:
                     logger.info("File is available on S3")
                     return object_name
@@ -119,7 +123,7 @@ class ObjectDetectionBot(Bot):
                     photo_name = self.upload_to_s3(photo_path)
                     logger.info(f'Photo uploaded to S3 with name: {photo_name}')
 
-                    photo_url = f'https://{self.s3_bucket_name}.s3.{self.s3_region}.amazonaws.com/{photo_name}'
+                    photo_url = f'https://{self.bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
                     logger.info(f'Photo URL: {photo_url}')
 
                     predictions = self.request_yolo5_predictions(photo_url)
