@@ -8,7 +8,6 @@ import requests
 from dotenv import load_dotenv
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_dotenv(dotenv_path='/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
