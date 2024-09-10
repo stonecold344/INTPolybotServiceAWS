@@ -4,6 +4,8 @@ services:
   polybot:
     image: ${POLYBOT_IMG_NAME}
     container_name: polybot
+    ports:
+      - "8443:8443"
     environment:
         TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
         TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}

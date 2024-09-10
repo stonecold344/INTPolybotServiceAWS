@@ -144,4 +144,4 @@ if __name__ == "__main__":
         get_webhook_info()
     except Exception as e:
         logging.error(f"Error setting or getting webhook: {e}")
-    app.run(host='0.0.0.0', port=8443)
+    app.run(host='0.0.0.0', port=8443, debug=True)
