@@ -8,13 +8,14 @@ import requests
 from dotenv import load_dotenv
 import logging
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-load_dotenv(dotenv_path='/home/ubuntu/projects/AWSProject-bennyi/polybot/.env')
+# Load environment variables from the .env file
+load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
 logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
-
 
 def get_secret(secret_id):
     session = boto3.session.Session()
@@ -27,7 +28,6 @@ def get_secret(secret_id):
     except Exception as e:
         logging.error(f"Error retrieving secret: {e}")
         raise e
-
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -45,7 +45,7 @@ SQS_URL = os.getenv('SQS_URL')
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error(
-        f"Missing environment variables: {TELEGRAM_TOKEN}, {TELEGRAM_APP_URL}, {S3_BUCKET_NAME}, {YOLO5_URL}, {DYNAMODB_TABLE}, {AWS_REGION}, {SQS_URL}")
+        f"Missing environment variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
@@ -54,7 +54,6 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
 bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
-
 
 def set_webhook():
     try:
@@ -75,8 +74,6 @@ def set_webhook():
             logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s",
                          current_url)
 
-
-
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
         response = requests.post(set_url, data={"url": desired_url})
@@ -92,7 +89,6 @@ def set_webhook():
         logging.error(f"Error in setting webhook: {e}")
         raise e
 
-
 # Function to get webhook info
 def get_webhook_info():
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
@@ -103,23 +99,26 @@ def get_webhook_info():
 def index():
     return 'Ok'
 
-
 @app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
 def webhook():
     req = request.get_json()
+    if req is None:
+        logging.warning("Received empty request payload")
+        return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
-
 
 @app.route('/results', methods=['POST'])
 def results():
     prediction_id = request.args.get('predictionId')
     if not prediction_id:
+        logging.error("Missing predictionId")
         return jsonify({'error': 'predictionId is required'}), 400
 
     try:
         response = table.get_item(Key={'prediction_id': prediction_id})
         if 'Item' not in response:
+            logging.error(f"Prediction not found for ID: {prediction_id}")
             return jsonify({'error': 'Prediction not found'}), 404
         prediction_summary = response['Item']
         chat_id = prediction_summary['chat_id']
@@ -128,20 +127,14 @@ def results():
         bot.send_text(chat_id, text_results)
         return 'Ok'
     except Exception as e:
+        logging.error(f"Error fetching prediction: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/loadTest/', methods=['POST'])
 def load_test():
     req = request.get_json()
+    if req is None:
+        logging.warning("Received empty request payload")
+        return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
-
-
-if __name__ == "__main__":
-    try:
-        set_webhook()
-        get_webhook_info()
-    except Exception as e:
-        logging.error(f"Error setting or getting webhook: {e}")
-    app.run(host='0.0.0.0', port=8443, debug=True)
