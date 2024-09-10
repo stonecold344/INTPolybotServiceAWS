@@ -67,7 +67,7 @@ def set_webhook():
 
         # Check if webhook is already set to the correct URL
         current_url = webhook_info['result'].get('url', None)
-        desired_url = f"https://aws-domain-bennyi.int-devops.click/{TELEGRAM_TOKEN}/"
+        desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
 
         if current_url == desired_url:
             logging.info("Webhook is already set to the desired URL: %s", current_url)
