@@ -22,6 +22,12 @@ polybot_url = os.getenv('POLYBOT_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
+# Ensure all environment variables are loaded
+if not all([SQS_QUEUE_NAME, AWS_REGION, polybot_url, DYNAMODB_TABLE, S3_BUCKET_NAME]):
+    logging.error(
+        f"Missing environment variables: S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_QUEUE_NAME}")
+    raise ValueError("One or more environment variables are missing")
+
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
