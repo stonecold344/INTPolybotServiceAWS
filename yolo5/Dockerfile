@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 # Install git and curl
 RUN apt-get update && \
-    apt-get install -y git curl && \
+    apt-get install -y git curl loguru && \
     pip install --upgrade pip
 
 
