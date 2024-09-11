@@ -26,7 +26,7 @@ dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb_client.Table(DYNAMODB_TABLE)
 s3_folder_path = 'aws-project'
 
-with open("usr/src/app/yolov5/data", "r") as stream:
+with open("/usr/src/app/yolov5/data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
 
 def download_image_from_s3(img_name):
