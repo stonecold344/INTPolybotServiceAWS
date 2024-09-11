@@ -16,6 +16,5 @@ pillow
 requests
 setuptools
 detect
-yolov5
 bson
 botocore
