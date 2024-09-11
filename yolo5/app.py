@@ -9,7 +9,7 @@ import json
 from dotenv import load_dotenv
 import sys
 sys.path.append('/usr/src/app/yolov5')
-from yolov5 import run
+from detect import run
 
 load_dotenv()
 

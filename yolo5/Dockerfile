@@ -3,24 +3,27 @@ FROM python:3.11-slim
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Install git and curl
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y git curl && \
-    pip install --upgrade pip
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first to utilize Docker layer caching
+RUN pip install --upgrade pip
 
 # Clone YOLOv5 repository
-RUN git clone https://github.com/ultralytics/yolov5.git /usr/src/app
+RUN git clone https://github.com/ultralytics/yolov5.git /usr/src/app/yolov5
 
 # Install YOLOv5 dependencies
-RUN pip install -r /usr/src/app/requirements.txt
+RUN pip install -r /usr/src/app/yolov5/requirements.txt
 
 # Download YOLOv5 weights
-RUN curl -L https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt -o /usr/src/app/yolov5s.pt
+RUN curl -L https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt -o /usr/src/app/yolov5/yolov5s.pt
 
 # Copy your application code
 COPY . /usr/src/app
 
-# Install additional Python packages
+# Install additional Python packages (your app-specific requirements)
 RUN pip install loguru boto3 python-dotenv requests pyyaml
 
 # Set the working directory to your application
