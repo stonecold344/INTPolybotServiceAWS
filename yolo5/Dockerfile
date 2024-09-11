@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 # Install git and curl
 RUN apt-get update && \
-    apt-get install -y git curl loguru && \
+    apt-get install -y git curl && \
     pip install --upgrade pip
 
 
@@ -16,6 +16,7 @@ WORKDIR /usr/src/app/yolov5
 
 # Install YOLOv5 dependencies
 RUN pip install -r requirements.txt
+RUN pip install loguru
 
 # Download YOLOv5 weights
 RUN curl -L https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt -o yolov5s.pt
