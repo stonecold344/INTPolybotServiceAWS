@@ -7,7 +7,9 @@ import boto3
 import requests
 import json
 from dotenv import load_dotenv
-from yolov5 import run  # Ensure that yolov5 is properly imported and available
+import sys
+sys.path.append('/usr/src/app/yolov5')
+from yolov5 import run
 
 load_dotenv()
 
