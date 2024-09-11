@@ -23,6 +23,7 @@ ENV AWS_REGION='eu-west-3'
 ENV DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'
 ENV SQS_QUEUE_URL=https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi
 
+
 # Copy the application code
 COPY . .
 
