@@ -11,7 +11,7 @@ RUN apt-get update && \
 
 
 # Clone YOLOv5 repository
-RUN git clone https://github.com/ultralytics/yolov5.git
+RUN git clone https://github.com/ultralytics/yolov5.git /usr/src/app/yolov5
 WORKDIR /usr/src/app/yolov5
 
 # Install YOLOv5 dependencies
