@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 import sys
 sys.path.append('/usr/src/app/yolov5')
 from detect import run
+import logging
 
-load_dotenv()
+load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
+logging.info("Env file loaded")
 
 # Initialize S3, SQS, and DynamoDB clients
 SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME')
