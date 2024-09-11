@@ -91,7 +91,7 @@ def consume():
                 # Run YOLOv5 for object detection
                 run(
                     weights='yolov5s.pt',
-                    data='data/coco128.yaml',
+                    data='/usr/src/app/yolov5/data/coco128.yaml',
                     source=original_img_path,
                     project='static/data',
                     name=prediction_id,
