@@ -5,7 +5,8 @@ FROM python:3.9-slim
 WORKDIR /usr/src/app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y awscli\
+RUN apt-get update && apt-get install -y \
+    awscli \
     openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,10 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gunicorn
 
 # Set environment variables
+# These can be managed outside Dockerfile in production
 ENV AWS_REGION='eu-west-3'
 ENV DYNAMODB_TABLE='AWS-Project-Predictions-bennyi'
-ENV SQS_QUEUE_URL=https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi
-
+ENV SQS_QUEUE_URL='https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi'
 
 # Copy the application code
 COPY . .

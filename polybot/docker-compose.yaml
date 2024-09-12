@@ -17,6 +17,8 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
+    networks:
+      - polybot-network
 
   dynamodb:
     image: amazon/dynamodb-local
@@ -26,3 +28,9 @@ services:
     volumes:
       - ./dynamodb:/home/dynamodblocal/data
     command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    networks:
+      - polybot-network
+
+networks:
+  polybot-network:
+    driver: bridge
