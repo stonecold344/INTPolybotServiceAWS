@@ -82,7 +82,7 @@ jobs:
             echo "DYNAMODB_TABLE=AWS-Project-Predictions-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/yolo5/.env
             echo "S3_BUCKET_NAME=bennyi-aws-s3-bucket" >> /home/ubuntu/projects/AWSProject-bennyi/yolo5/.env
             echo "YOLO5_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/yolo5:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/yolo5/.env
-            echo "SQS_QUEUE_NAME='aws-sqs-image-processing-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/yolo5/.env
+            echo "SQS_QUEUE_NAME='https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi'" >> /home/ubuntu/projects/AWSProject-bennyi/yolo5/.env
 
             # Login to Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

@@ -25,7 +25,7 @@ S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 # Ensure all environment variables are loaded
 if not all([SQS_URL, AWS_REGION, DYNAMODB_TABLE, S3_BUCKET_NAME]):
     logging.error(
-        f"Missing environment variables: S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+        f"Missing environment variables: SQS_URL={SQS_URL}, AWS_REGION={AWS_REGION}, DYNAMODB_TABLE={DYNAMODB_TABLE}, S3_BUCKET_NAME={S3_BUCKET_NAME} ")
     raise ValueError("One or more environment variables are missing")
 
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
