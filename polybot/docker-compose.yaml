@@ -10,12 +10,10 @@ services:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      YOLO5_URL: ${YOLO5_URL} # Ensure this points to the correct URL of the yolo5 service
+      YOLO5_URL: ${YOLO5_URL}
       DYNAMODB_TABLE: ${DYNAMODB_TABLE}
       AWS_REGION: ${AWS_REGION}
       SQS_URL: ${SQS_URL}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
