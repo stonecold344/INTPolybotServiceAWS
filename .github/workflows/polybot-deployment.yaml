@@ -52,9 +52,16 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
+            # Install AWS CLI if needed
+            if ! command -v aws &> /dev/null
+            then
+              sudo apt-get update -y
+              sudo apt-get install -y awscli
+            fi
+  
             # Fetch Yolo5 EC2 IP address dynamically (example using AWS CLI)
             YOLO5_IP=$(aws ec2 describe-instances \
-              --filters "Name=tag:Name,Values=Yolo5Instance" \
+              --filters "Name=tag:aws-yolo5-bennyi,Values=Yolo5Instance" \
               --query "Reservations[*].Instances[*].PublicIpAddress" \
               --region eu-west-3 --output text)
   
@@ -67,7 +74,7 @@ jobs:
             echo "DYNAMODB_TABLE=AWS-Project-Predictions-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "AWS_REGION=eu-west-3" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "SQS_URL=https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-            
+
             # Install Docker and Docker Compose if needed
             sudo apt-get update -y
             sudo apt-get install -y docker.io
@@ -88,5 +95,3 @@ jobs:
             cd /home/ubuntu/projects/AWSProject-bennyi/polybot
             docker-compose down
             docker-compose up -d
-
-
