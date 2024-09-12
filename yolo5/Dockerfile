@@ -24,7 +24,7 @@ RUN curl -L https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s
 COPY . /usr/src/app
 
 # Install additional Python packages (your app-specific requirements)
-RUN pip install loguru boto3 python-dotenv requests pyyaml
+RUN pip install loguru boto3 python-dotenv requests pyyaml flask
 
 # Set the working directory to your application
 WORKDIR /usr/src/app
