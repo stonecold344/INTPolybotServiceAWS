@@ -16,16 +16,16 @@ load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
 logging.info("Env file loaded")
 
 # Initialize S3, SQS, and DynamoDB clients
-SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME')
+SQS_URL = os.getenv('SQS_URL')
 AWS_REGION = os.getenv('AWS_REGION')
 polybot_url = os.getenv('POLYBOT_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 # Ensure all environment variables are loaded
-if not all([SQS_QUEUE_NAME, AWS_REGION, polybot_url, DYNAMODB_TABLE, S3_BUCKET_NAME]):
+if not all([SQS_URL, AWS_REGION, DYNAMODB_TABLE, S3_BUCKET_NAME]):
     logging.error(
-        f"Missing environment variables: S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_QUEUE_NAME}")
+        f"Missing environment variables: S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
     raise ValueError("One or more environment variables are missing")
 
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
@@ -78,7 +78,7 @@ def notify_polybot(prediction_id):
 
 def consume():
     while True:
-        response = sqs_client.receive_message(QueueUrl=SQS_QUEUE_NAME, MaxNumberOfMessages=1, WaitTimeSeconds=5)
+        response = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=5)
 
         if 'Messages' in response:
             message = json.loads(response['Messages'][0]['Body'])
@@ -158,7 +158,7 @@ def consume():
                 continue
 
             # Delete the message from the SQS queue
-            sqs_client.delete_message(QueueUrl=SQS_QUEUE_NAME, ReceiptHandle=receipt_handle)
+            sqs_client.delete_message(QueueUrl=SQS_URL, ReceiptHandle=receipt_handle)
 
 if __name__ == "__main__":
     consume()
