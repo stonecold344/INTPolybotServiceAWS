@@ -17,6 +17,7 @@ logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
 
+
 def get_secret(secret_id):
     session = boto3.session.Session()
     client = session.client(service_name='secretsmanager', region_name='eu-west-3')
@@ -29,6 +30,7 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
+
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
 secrets = get_secret(SECRET_ID)
@@ -37,7 +39,7 @@ secrets = get_secret(SECRET_ID)
 telegram_token = secrets.get("TELEGRAM_TOKEN")
 
 # Use the token in your application
-print(f"Telegram Token: {telegram_token}")
+logging.info(f"Telegram Token: {telegram_token}")
 
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
@@ -59,6 +61,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
 bot = ObjectDetectionBot(telegram_token, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
+
 
 def set_webhook():
     try:
@@ -94,24 +97,29 @@ def set_webhook():
         logging.error(f"Error in setting webhook: {e}")
         raise e
 
+
 # Function to get webhook info
 def get_webhook_info():
     url = f"https://api.telegram.org/bot{telegram_token}/getWebhookInfo"
     response = requests.get(url)
     logging.info("Webhook info: %s", response.json())
 
+
 @app.route('/', methods=['GET'])
 def index():
     return 'Ok'
 
+
 @app.route(f'/{telegram_token}/', methods=['POST'])
 def webhook():
     req = request.get_json()
+    logging.info("Received request: %s", req)
     if req is None:
         logging.warning("Received empty request payload")
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
+
 
 @app.route('/results', methods=['POST'])
 def results():
@@ -135,6 +143,41 @@ def results():
         logging.error(f"Error fetching prediction: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        req = request.get_json()
+        if req is None:
+            logging.warning("Received empty request payload")
+            return jsonify({'error': 'Empty request payload'}), 400
+
+        # Extract necessary fields from request
+        image_url = req.get('image_url')
+        if not image_url:
+            logging.error("Missing image_url")
+            return jsonify({'error': 'image_url is required'}), 400
+
+        # Call YOLO5 service for prediction
+        response = requests.post(YOLO5_URL, json={"image_url": image_url})
+        if response.status_code != 200:
+            logging.error(f"Error from YOLO5 service: {response.text}")
+            return jsonify({'error': 'Error from YOLO5 service'}), 500
+
+        # Process YOLO5 response
+        result = response.json()
+        prediction_id = result.get('prediction_id')
+        if not prediction_id:
+            logging.error("Missing prediction_id in YOLO5 response")
+            return jsonify({'error': 'Prediction ID not found in YOLO5 response'}), 500
+
+        return jsonify({'prediction_id': prediction_id}), 200
+
+    except Exception as e:
+        logging.error(f"Error in /predict endpoint: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/loadTest/', methods=['POST'])
 def load_test():
     req = request.get_json()
@@ -143,3 +186,8 @@ def load_test():
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
+
+
+if __name__ == '__main__':
+    set_webhook()  # Set the webhook when the app starts
+    app.run(host='0.0.0.0', port=8443, debug=True)
