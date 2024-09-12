@@ -10,7 +10,7 @@ services:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      YOLO5_URL: ${YOLO5_URL}
+      YOLO5_URL: ${YOLO5_URL} # This will be provided dynamically from .env file
       DYNAMODB_TABLE: ${DYNAMODB_TABLE}
       AWS_REGION: ${AWS_REGION}
       SQS_URL: ${SQS_URL}
@@ -19,3 +19,15 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
+    depends_on:
+      - yolo5
+      - dynamodb
+
+  dynamodb:
+    image: amazon/dynamodb-local
+    container_name: dynamodb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./dynamodb:/home/dynamodblocal/data
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
