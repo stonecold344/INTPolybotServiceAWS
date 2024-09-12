@@ -16,7 +16,6 @@ services:
       SQS_URL: ${SQS_URL}
     volumes:
       - ./logs:/usr/src/app/logs
-    restart: always
     networks:
       - polybot-network
 

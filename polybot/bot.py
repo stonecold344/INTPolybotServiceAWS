@@ -135,17 +135,19 @@ class ObjectDetectionBot(Bot):
                     photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
                     logger.info(f'Photo URL: {photo_url}')
 
-                    # Create a message to send to SQS
-                    sqs_message = json.dumps({
-                        'photo_url': photo_url,
-                        'chat_id': chat_id
-                    })
-
-                    # Send the message to SQS
-                    self.send_message_to_sqs(sqs_message)
-
-                    self.send_text(chat_id, 'Your photo is being processed. You will receive the results shortly.')
-                    logger.info(f'Sent notification to chat_id {chat_id}')
+                    # Call YOLO5 for object detection
+                    yolo5_response = requests.post(self.yolo5_url, json={"image_url": photo_url})
+                    if yolo5_response.status_code == 200:
+                        result = yolo5_response.json()
+                        prediction_id = result.get('prediction_id')
+                        if prediction_id:
+                            self.send_text(chat_id, f"Prediction ID: {prediction_id}")
+                            # Queue the prediction job
+                            self.queue_prediction_job(prediction_id, chat_id)
+                        else:
+                            self.send_text(chat_id, "Failed to get prediction ID.")
+                    else:
+                        self.send_text(chat_id, "Error processing image.")
 
                     # Reset the pending state after processing
                     self.pending_prediction[chat_id] = False
@@ -160,3 +162,13 @@ class ObjectDetectionBot(Bot):
             self.send_text(chat_id, 'Unsupported command or message.')
             logger.info(f'Unsupported message type for chat_id {chat_id}.')
 
+    def queue_prediction_job(self, prediction_id, chat_id):
+        message_body = json.dumps({
+            'prediction_id': prediction_id,
+            'chat_id': chat_id
+        })
+        try:
+            self.send_message_to_sqs(message_body)
+            logger.info(f"Prediction job queued with ID: {prediction_id}")
+        except Exception as e:
+            logger.error(f"Error queuing prediction job: {e}")

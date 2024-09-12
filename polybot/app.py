@@ -17,7 +17,6 @@ logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
 
-
 def get_secret(secret_id):
     session = boto3.session.Session()
     client = session.client(service_name='secretsmanager', region_name='eu-west-3')
@@ -30,12 +29,9 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
-
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
 secrets = get_secret(SECRET_ID)
-
-# Access specific keys from the retrieved secrets
 telegram_token = secrets.get("TELEGRAM_TOKEN")
 
 # Use the token in your application
@@ -51,8 +47,7 @@ SQS_URL = os.getenv('SQS_URL')
 
 # Ensure all environment variables are loaded
 if not all([telegram_token, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
-    logging.error(
-        f"Missing environment variables: TELEGRAM_TOKEN={telegram_token}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+    logging.error("One or more environment variables are missing")
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
@@ -61,7 +56,6 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
 bot = ObjectDetectionBot(telegram_token, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
-
 
 def set_webhook():
     try:
@@ -79,8 +73,7 @@ def set_webhook():
             logging.info("Webhook is already set to the desired URL: %s", current_url)
             return
         else:
-            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s",
-                         current_url)
+            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
 
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{telegram_token}/setWebhook"
@@ -94,21 +87,11 @@ def set_webhook():
             logging.error("Failed to set webhook: %s", result)
 
     except Exception as e:
-        logging.error(f"Error in setting webhook: {e}")
-        raise e
-
-
-# Function to get webhook info
-def get_webhook_info():
-    url = f"https://api.telegram.org/bot{telegram_token}/getWebhookInfo"
-    response = requests.get(url)
-    logging.info("Webhook info: %s", response.json())
-
+        logging.error(f"Error occurred while setting webhook: {e}")
 
 @app.route('/', methods=['GET'])
 def index():
     return 'Ok'
-
 
 @app.route(f'/{telegram_token}/', methods=['POST'])
 def webhook():
@@ -119,7 +102,6 @@ def webhook():
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
-
 
 @app.route('/results', methods=['POST'])
 def results():
@@ -142,7 +124,6 @@ def results():
     except Exception as e:
         logging.error(f"Error fetching prediction: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -177,7 +158,6 @@ def predict():
         logging.error(f"Error in /predict endpoint: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/loadTest/', methods=['POST'])
 def load_test():
     req = request.get_json()
@@ -186,7 +166,6 @@ def load_test():
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
-
 
 if __name__ == '__main__':
     set_webhook()  # Set the webhook when the app starts
