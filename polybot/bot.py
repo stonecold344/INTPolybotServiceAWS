@@ -10,7 +10,7 @@ import boto3
 
 
 class Bot:
-    def __init__(self, token, telegram_chat_url):
+    def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
         self.telegram_bot_client = telebot.TeleBot(token)
         self.telegram_bot_client.remove_webhook()
         self.telegram_bot_client.set_webhook(url=f'{telegram_chat_url}/{token}/', timeout=60)
@@ -62,9 +62,8 @@ class Bot:
 
 class ObjectDetectionBot(Bot):
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
-        super().__init__(token, telegram_chat_url)
+        super().__init__(token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url)
         self.s3_bucket_name = s3_bucket_name
-        self.yolo5_url = yolo5_url
         self.aws_region = aws_region
         self.sqs_url = sqs_url
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
@@ -89,7 +88,8 @@ class ObjectDetectionBot(Bot):
                     logger.info("File is available on S3")
                     return object_name
                 else:
-                    logger.info(f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt+1}/{max_attempts})")
+                    logger.info(
+                        f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt + 1}/{max_attempts})")
                     time.sleep(5)
             else:
                 raise TimeoutError("File upload timeout. Could not find file after 10 attempts.")
@@ -98,16 +98,15 @@ class ObjectDetectionBot(Bot):
             logger.error(f"Error uploading to S3: {e}")
             raise
 
-    def request_yolo5_predictions(self, image_url):
+    def send_message_to_sqs(self, message_body):
         try:
-            response = requests.post(self.yolo5_url, json={'image_url': image_url})
-            response.raise_for_status()
-            predictions = response.json()
-            logger.info(f"Predictions received: {predictions}")
-            return predictions
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error requesting YOLO5 predictions: {e}")
-            return {}
+            response = self.sqs_client.send_message(
+                QueueUrl=self.sqs_url,
+                MessageBody=message_body
+            )
+            logger.info(f"Message sent to SQS: {response.get('MessageId')}")
+        except Exception as e:
+            logger.error(f"Error sending message to SQS: {e}")
 
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
@@ -136,16 +135,17 @@ class ObjectDetectionBot(Bot):
                     photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
                     logger.info(f'Photo URL: {photo_url}')
 
-                    predictions = self.request_yolo5_predictions(photo_url)
-                    logger.info(f'Predictions received: {predictions}')
+                    # Create a message to send to SQS
+                    sqs_message = json.dumps({
+                        'photo_url': photo_url,
+                        'chat_id': chat_id
+                    })
 
-                    if predictions:
-                        prediction_text = "\n".join([f"{obj}: {conf}" for obj, conf in predictions.items()])
-                    else:
-                        prediction_text = "No predictions were returned."
+                    # Send the message to SQS
+                    self.send_message_to_sqs(sqs_message)
 
-                    self.send_text(chat_id, prediction_text)
-                    logger.info(f'Sent prediction result to chat_id {chat_id}')
+                    self.send_text(chat_id, 'Your photo is being processed. You will receive the results shortly.')
+                    logger.info(f'Sent notification to chat_id {chat_id}')
 
                     # Reset the pending state after processing
                     self.pending_prediction[chat_id] = False
@@ -159,3 +159,4 @@ class ObjectDetectionBot(Bot):
         else:
             self.send_text(chat_id, 'Unsupported command or message.')
             logger.info(f'Unsupported message type for chat_id {chat_id}.')
+
