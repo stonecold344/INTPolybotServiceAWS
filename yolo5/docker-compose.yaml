@@ -1,17 +1,19 @@
 version: '3.8'
-
 services:
   yolo5:
-    build: .
-    container_name: yolo5
-    ports:
-      - "8081:8081"
+    image: yolo5:v1
     environment:
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      DYNAMODB_TABLE: ${DYNAMODB_TABLE}
-      AWS_REGION: ${AWS_REGION}
+      - SQS_URL=${SQS_URL}
+      - AWS_REGION=${AWS_REGION}
+      - DYNAMODB_TABLE=${DYNAMODB_TABLE}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - POLYBOT_URL=${POLYBOT_URL}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     volumes:
-      - ./data:/usr/src/app/data
-    restart: always
+      - ./yolo5:/usr/src/app
+    depends_on:
+      - dynamodb
+      - sqs
 
 

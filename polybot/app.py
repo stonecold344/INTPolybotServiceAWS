@@ -32,7 +32,12 @@ def get_secret(secret_id):
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
 secrets = get_secret(SECRET_ID)
-TELEGRAM_TOKEN = secrets.get('TELEGRAM_TOKEN')
+
+# Access specific keys from the retrieved secrets
+telegram_token = secrets.get("TELEGRAM_TOKEN")
+
+# Use the token in your application
+print(f"Telegram Token: {telegram_token}")
 
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
