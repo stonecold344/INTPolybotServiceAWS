@@ -31,13 +31,20 @@ def get_secret(secret_id):
         raise e
 
 
-
+yolo5_instance_ip = {}
 ec2 = boto3.client('ec2', region_name='eu-west-3')
 response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
 for reservation in response['Reservations']:
     for instance in reservation['Instances']:
         yolo5_instance_ip = instance.get('PublicIpAddress')
         print(instance.get('PublicIpAddress'))
+
+    if yolo5_instance_ip:
+        YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
+        logging.info(f"YOLO5 service URL: {YOLO5_URL}")
+    else:
+        logging.error("Could not find YOLO5 instance IP")
+
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -50,11 +57,12 @@ logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-YOLO5_URL = 'http://${yolo5_instance_ip}/yolo5:8081'
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
-logging.info(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL)
+logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
+             f"S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
+             f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
