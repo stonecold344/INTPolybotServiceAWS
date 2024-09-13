@@ -30,6 +30,7 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
+# Retrieve YOLO5 instance IP
 yolo5_instance_ip = {}
 ec2 = boto3.client('ec2', region_name='eu-west-3')
 response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
@@ -43,7 +44,6 @@ if yolo5_instance_ip:
     logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 else:
     logging.error("Could not find YOLO5 instance IP")
-
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -62,6 +62,7 @@ SQS_URL = os.getenv('SQS_URL')
 logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
              f"S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
              f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
@@ -111,16 +112,7 @@ def index():
     return 'Ok'
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == 'POST':
-        # Handle incoming POST requests from Telegram here
-        data = request.json
-        # Process the data (e.g., check for messages, commands, etc.)
-        return 'OK', 200
-    return "GET request not allowed", 405
-
-@app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
-def webhook():
+def handle_webhook():
     req = request.get_json()
     logging.info("Received request: %s", req)
     if req is None:
