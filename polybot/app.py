@@ -7,6 +7,7 @@ import json
 import requests
 from dotenv import load_dotenv
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -80,36 +81,48 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
 
 def set_webhook():
-    try:
-        # Get current webhook info
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
-        responses = requests.get(url)
-        webhook_info = responses.json()
-        logging.info("Webhook info: %s", webhook_info)
+    retry_attempts = 3
+    for attempt in range(retry_attempts):
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
+            responses = requests.get(url)
+            responses.raise_for_status()
+            webhook_info = responses.json()
+            logging.info("Webhook info: %s", webhook_info)
 
-        # Check if webhook is already set to the correct URL
-        current_url = webhook_info['result'].get('url', None)
-        desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
+            current_url = webhook_info['result'].get('url', None)
+            desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
 
-        if current_url == desired_url:
-            logging.info("Webhook is already set to the desired URL: %s", current_url)
+            if current_url == desired_url:
+                logging.info("Webhook is already set to the desired URL: %s", current_url)
+                return
+            else:
+                logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
+
+            set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+            responses = requests.post(set_url, data={"url": desired_url})
+            responses.raise_for_status()
+            result = responses.json()
+            logging.info("Set webhook response: %s", result)
+
+            if result.get('ok'):
+                logging.info("Webhook set successfully")
+            else:
+                logging.error("Failed to set webhook: %s", result)
+
             return
-        else:
-            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
 
-        # Set webhook if not already set or has a different URL
-        set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
-        responses = requests.post(set_url, data={"url": desired_url})
-        result = responses.json()
-        logging.info("Set webhook response: %s", result)
-
-        if result.get('ok'):
-            logging.info("Webhook set successfully")
-        else:
-            logging.error("Failed to set webhook: %s", result)
-
-    except Exception as e:
-        logging.error(f"Error occurred while setting webhook: {e}")
+        except requests.exceptions.HTTPError as http_err:
+            if http_err.response.status_code == 429:
+                retry_after = int(http_err.response.headers.get('Retry-After', 1))
+                logging.info(f"Rate limit exceeded. Retrying after {retry_after} seconds...")
+                time.sleep(retry_after)
+            else:
+                logging.error(f"HTTP error occurred: {http_err}")
+                raise
+        except Exception as e:
+            logging.error(f"Error occurred while setting webhook: {e}")
+            raise
 
 @app.route('/', methods=['GET'])
 def index():
@@ -155,7 +168,6 @@ def predict():
             logging.warning("Received empty request payload")
             return jsonify({'error': 'Empty request payload'}), 400
 
-        # Extract necessary fields from request
         image_url = req.get('image_url')
         if not image_url:
             logging.error("Missing image_url")
@@ -165,13 +177,11 @@ def predict():
             logging.error("YOLO5_URL is not set")
             return jsonify({'error': 'YOLO5 service URL is not available'}), 500
 
-        # Call YOLO5 service for prediction
         responses = requests.post(YOLO5_URL, json={"image_url": image_url})
         if responses.status_code != 200:
             logging.error(f"Error from YOLO5 service: {responses.text}")
             return jsonify({'error': 'Error from YOLO5 service'}), 500
 
-        # Process YOLO5 response
         result = responses.json()
         prediction_id = result.get('prediction_id')
         if not prediction_id:
