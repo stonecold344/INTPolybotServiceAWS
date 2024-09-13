@@ -66,7 +66,7 @@ class ObjectDetectionBot(Bot):
         self.s3_bucket_name = s3_bucket_name
         self.aws_region = aws_region
         self.sqs_url = sqs_url
-        self.yolo5_url = yolo5_url
+        self.yolo5_url=  yolo5_url
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
         self.sqs_client = boto3.client('sqs', region_name=self.aws_region)
         self.pending_prediction = {}
@@ -82,7 +82,7 @@ class ObjectDetectionBot(Bot):
             self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
 
             # Retry checking for file on S3
-            max_attempts = 10
+            max_attempts = 1
             for attempt in range(max_attempts):
                 response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
                 if 'Contents' in response:
