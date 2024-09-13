@@ -45,6 +45,9 @@ jobs:
           for IP in "${IP_ARRAY[@]}"; do
             echo "Deploying to $IP"
             
+            # Create the target directory if it doesn't exist
+            ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no ubuntu@$IP "mkdir -p /home/ubuntu/projects/AWSProject-bennyi/"
+
             # Copy the polybot directory to EC2
             scp -i /tmp/ssh_key -o StrictHostKeyChecking=no -r polybot/ ubuntu@$IP:/home/ubuntu/projects/AWSProject-bennyi/
             
