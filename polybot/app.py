@@ -42,12 +42,14 @@ for reservation in response['Reservations']:
             yolo5_instance_ips.append(public_ip)
             logging.info(f"Found YOLO5 instance IP: {public_ip}")
 
+
+
+YOLO5_URL = None  # Handle the case where YOLO5_URL is not set
 if yolo5_instance_ips:
     YOLO5_URL = f'http://{yolo5_instance_ips[0]}:8081'  # Use the first IP if there are multiple
     logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 else:
     logging.error("Could not find YOLO5 instance IP")
-    YOLO5_URL = None  # Handle the case where YOLO5_URL is not set
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
