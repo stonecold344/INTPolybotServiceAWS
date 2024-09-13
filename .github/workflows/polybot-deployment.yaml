@@ -62,7 +62,7 @@ jobs:
             # Create the .env file with dynamic YOLO5_URL
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "S3_BUCKET_NAME=bennyi-aws-s3-bucket" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-            echo "TELEGRAM_APP_URL=aws-domain-bennyi.int-devops.click" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+            echo "TELEGRAM_APP_URL=aws-domain-bennyi.int-devops.click:8443" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "DYNAMODB_TABLE=AWS-Project-Predictions-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "AWS_REGION=eu-west-3" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env

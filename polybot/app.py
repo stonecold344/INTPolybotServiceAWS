@@ -110,6 +110,15 @@ def set_webhook():
 def index():
     return 'Ok'
 
+@app.route('/', methods=['POST'])
+def webhook():
+    if request.method == 'POST':
+        # Handle incoming POST requests from Telegram here
+        data = request.json
+        # Process the data (e.g., check for messages, commands, etc.)
+        return 'OK', 200
+    return "GET request not allowed", 405
+
 @app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
 def webhook():
     req = request.get_json()
