@@ -71,8 +71,8 @@ def set_webhook():
     try:
         # Get current webhook info
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
-        response = requests.get(url)
-        webhook_info = response.json()
+        responses = requests.get(url)
+        webhook_info = responses.json()
         logging.info("Webhook info: %s", webhook_info)
 
         # Check if webhook is already set to the correct URL
@@ -87,8 +87,8 @@ def set_webhook():
 
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
-        response = requests.post(set_url, data={"url": desired_url})
-        result = response.json()
+        responses = requests.post(set_url, data={"url": desired_url})
+        result = responses.json()
         logging.info("Set webhook response: %s", result)
 
         if result.get('ok'):
@@ -121,11 +121,11 @@ def results():
         return jsonify({'error': 'predictionId is required'}), 400
 
     try:
-        response = table.get_item(Key={'prediction_id': prediction_id})
-        if 'Item' not in response:
+        responses = table.get_item(Key={'prediction_id': prediction_id})
+        if 'Item' not in responses:
             logging.error(f"Prediction not found for ID: {prediction_id}")
             return jsonify({'error': 'Prediction not found'}), 404
-        prediction_summary = response['Item']
+        prediction_summary = responses['Item']
         chat_id = prediction_summary['chat_id']
         labels = prediction_summary['labels']
         text_results = '\n'.join([f"{label['class']} : {label['count']}" for label in labels])
@@ -150,13 +150,13 @@ def predict():
             return jsonify({'error': 'image_url is required'}), 400
 
         # Call YOLO5 service for prediction
-        response = requests.post(YOLO5_URL, json={"image_url": image_url})
-        if response.status_code != 200:
-            logging.error(f"Error from YOLO5 service: {response.text}")
+        responses = requests.post(YOLO5_URL, json={"image_url": image_url})
+        if responses.status_code != 200:
+            logging.error(f"Error from YOLO5 service: {responses.text}")
             return jsonify({'error': 'Error from YOLO5 service'}), 500
 
         # Process YOLO5 response
-        result = response.json()
+        result = responses.json()
         prediction_id = result.get('prediction_id')
         if not prediction_id:
             logging.error("Missing prediction_id in YOLO5 response")
