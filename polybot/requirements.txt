@@ -9,3 +9,4 @@ requests
 uuid
 docker
 docker-compose
+net-tools

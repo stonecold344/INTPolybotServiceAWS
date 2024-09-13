@@ -8,6 +8,7 @@ WORKDIR /usr/src/app
 RUN apt-get update && apt-get install -y \
     awscli \
     openssh-server \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file
@@ -28,5 +29,8 @@ ENV SQS_QUEUE_URL='https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-imag
 # Copy the application code
 COPY . .
 
+# Expose the port
+EXPOSE 8443
+
 # Command to run the application with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8443", "app:app"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8443", "app:app"]
