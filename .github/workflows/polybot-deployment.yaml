@@ -34,6 +34,11 @@ jobs:
       - name: Checkout the repo code
         uses: actions/checkout@v2
 
+      - name: Create SSH Key File
+        run: |
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key  # Ensure the key is protected
+
       - name: Deploy to EC2 instances
         run: |
           IFS=',' read -r -a IP_ARRAY <<< "${{ env.EC2_PUBLIC_IPS }}"
@@ -41,10 +46,10 @@ jobs:
             echo "Deploying to $IP"
             
             # Copy the polybot directory to EC2
-            scp -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" -r polybot/ ubuntu@$IP:/home/ubuntu/projects/AWSProject-bennyi/
+            scp -i /tmp/ssh_key -o StrictHostKeyChecking=no -r polybot/ ubuntu@$IP:/home/ubuntu/projects/AWSProject-bennyi/
             
             # Update Docker Compose project on EC2
-            ssh -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" ubuntu@$IP << EOF
+            ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no ubuntu@$IP << 'EOF'
               # Install AWS CLI if needed
               if ! command -v aws &> /dev/null
               then
@@ -85,3 +90,7 @@ jobs:
               sudo docker-compose up -d
           EOF
           done
+
+      - name: Clean up SSH Key
+        run: |
+          rm -f /tmp/ssh_key  # Ensure the SSH key is deleted after the job
