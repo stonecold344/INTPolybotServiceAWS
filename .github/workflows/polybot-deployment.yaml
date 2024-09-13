@@ -44,7 +44,7 @@ jobs:
             scp -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" -r polybot/ ubuntu@$IP:/home/ubuntu/projects/AWSProject-bennyi/
             
             # Update Docker Compose project on EC2
-            ssh -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" ubuntu@$IP << 'EOF'
+            ssh -i "${{ secrets.EC2_SSH_PRIVATE_KEY }}" ubuntu@$IP << EOF
               # Install AWS CLI if needed
               if ! command -v aws &> /dev/null
               then
