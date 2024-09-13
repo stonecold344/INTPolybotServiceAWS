@@ -30,7 +30,6 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
-
 yolo5_instance_ip = {}
 ec2 = boto3.client('ec2', region_name='eu-west-3')
 response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
@@ -39,11 +38,11 @@ for reservation in response['Reservations']:
         yolo5_instance_ip = instance.get('PublicIpAddress')
         print(instance.get('PublicIpAddress'))
 
-    if yolo5_instance_ip:
-        YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
-        logging.info(f"YOLO5 service URL: {YOLO5_URL}")
-    else:
-        logging.error("Could not find YOLO5 instance IP")
+if yolo5_instance_ip:
+    YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
+    logging.info(f"YOLO5 service URL: {YOLO5_URL}")
+else:
+    logging.error("Could not find YOLO5 instance IP")
 
 
 # Retrieve the Telegram token
