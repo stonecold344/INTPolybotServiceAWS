@@ -19,6 +19,7 @@ app = flask.Flask(__name__)
 
 def get_secret(secret_id):
     session = boto3.session.Session()
+    logging.info(session.get_credentials())
     client = session.client(service_name='secretsmanager', region_name='eu-west-3')
 
     try:
@@ -28,6 +29,15 @@ def get_secret(secret_id):
     except Exception as e:
         logging.error(f"Error retrieving secret: {e}")
         raise e
+
+
+
+ec2 = boto3.client('ec2', region_name='eu-west-3')
+response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
+for reservation in response['Reservations']:
+    for instance in reservation['Instances']:
+        yolo5_instance_ip = instance.get('PublicIpAddress')
+        print(instance.get('PublicIpAddress'))
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -40,7 +50,7 @@ logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-YOLO5_URL = os.getenv('YOLO5_URL')
+YOLO5_URL = 'http:/${yolo5_instance_ip}/yolo5:8081'
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')

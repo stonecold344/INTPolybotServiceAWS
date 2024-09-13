@@ -59,15 +59,8 @@ jobs:
               sudo apt-get install -y awscli
             fi
   
-            # Fetch Yolo5 EC2 IP address dynamically (example using AWS CLI)
-            YOLO5_IP=$(aws ec2 describe-instances \
-              --filters "Name=tag:aws-yolo5-bennyi,Values=Yolo5Instance" \
-              --query "Reservations[*].Instances[*].PublicIpAddress" \
-              --region eu-west-3 --output text)
-  
             # Create the .env file with dynamic YOLO5_URL
             echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-            echo "YOLO5_URL=http://$YOLO5_IP:8081" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "S3_BUCKET_NAME=bennyi-aws-s3-bucket" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "TELEGRAM_APP_URL=aws-domain-bennyi.int-devops.click" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
             echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
