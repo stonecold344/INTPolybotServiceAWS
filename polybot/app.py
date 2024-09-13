@@ -19,7 +19,7 @@ app = flask.Flask(__name__)
 
 def get_secret(secret_id):
     session = boto3.session.Session()
-    logging.info(session.get_credentials())
+    logging.info("Session credentials: %s", session.get_credentials())
     client = session.client(service_name='secretsmanager', region_name='eu-west-3')
 
     try:
@@ -31,19 +31,23 @@ def get_secret(secret_id):
         raise e
 
 # Retrieve YOLO5 instance IP
-yolo5_instance_ip = {}
+yolo5_instance_ips = []
 ec2 = boto3.client('ec2', region_name='eu-west-3')
 response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
+
 for reservation in response['Reservations']:
     for instance in reservation['Instances']:
-        yolo5_instance_ip = instance.get('PublicIpAddress')
-        print(instance.get('PublicIpAddress'))
+        public_ip = instance.get('PublicIpAddress')
+        if public_ip:
+            yolo5_instance_ips.append(public_ip)
+            logging.info(f"Found YOLO5 instance IP: {public_ip}")
 
-if yolo5_instance_ip:
-    YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
+if yolo5_instance_ips:
+    YOLO5_URL = f'http://{yolo5_instance_ips[0]}:8081'  # Use the first IP if there are multiple
     logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 else:
     logging.error("Could not find YOLO5 instance IP")
+    YOLO5_URL = None  # Handle the case where YOLO5_URL is not set
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -156,6 +160,10 @@ def predict():
         if not image_url:
             logging.error("Missing image_url")
             return jsonify({'error': 'image_url is required'}), 400
+
+        if YOLO5_URL is None:
+            logging.error("YOLO5_URL is not set")
+            return jsonify({'error': 'YOLO5 service URL is not available'}), 500
 
         # Call YOLO5 service for prediction
         responses = requests.post(YOLO5_URL, json={"image_url": image_url})

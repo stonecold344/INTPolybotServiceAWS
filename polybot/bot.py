@@ -8,7 +8,6 @@ import uuid
 import requests
 import boto3
 
-
 class Bot:
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
         self.telegram_bot_client = telebot.TeleBot(token)
@@ -153,7 +152,8 @@ class ObjectDetectionBot(Bot):
                         else:
                             self.send_text(chat_id, "Failed to get prediction ID.")
                     else:
-                        self.send_text(chat_id, "Error processing image.")
+                        logger.error(f"YOLO5 API returned status code {yolo5_response.status_code}: {yolo5_response.text}")
+                        self.send_text(chat_id, "Error processing image with YOLO5.")
 
                     # Reset the pending state after processing
                     self.pending_prediction[chat_id] = False
