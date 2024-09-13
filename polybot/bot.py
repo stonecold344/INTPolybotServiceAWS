@@ -110,6 +110,12 @@ class ObjectDetectionBot(Bot):
 
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
+
+        # Ensure 'chat' and 'id' keys are in the message
+        if 'chat' not in msg or 'id' not in msg['chat']:
+            logger.error("Message format is incorrect, missing 'chat' or 'id'")
+            return
+
         chat_id = msg['chat']['id']
 
         if 'text' in msg:

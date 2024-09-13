@@ -32,10 +32,10 @@ def get_secret(secret_id):
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
 secrets = get_secret(SECRET_ID)
-telegram_token = secrets.get("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
 
 # Use the token in your application
-logging.info(f"Telegram Token: {telegram_token}")
+logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
@@ -46,7 +46,7 @@ AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
 
 # Ensure all environment variables are loaded
-if not all([telegram_token, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
+if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
     raise ValueError("One or more environment variables are missing")
 
@@ -55,19 +55,19 @@ dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
-bot = ObjectDetectionBot(telegram_token, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
+bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
 
 def set_webhook():
     try:
         # Get current webhook info
-        url = f"https://api.telegram.org/bot{telegram_token}/getWebhookInfo"
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
         response = requests.get(url)
         webhook_info = response.json()
         logging.info("Webhook info: %s", webhook_info)
 
         # Check if webhook is already set to the correct URL
         current_url = webhook_info['result'].get('url', None)
-        desired_url = f"{TELEGRAM_APP_URL}/{telegram_token}/"
+        desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
 
         if current_url == desired_url:
             logging.info("Webhook is already set to the desired URL: %s", current_url)
@@ -76,7 +76,7 @@ def set_webhook():
             logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
 
         # Set webhook if not already set or has a different URL
-        set_url = f"https://api.telegram.org/bot{telegram_token}/setWebhook"
+        set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
         response = requests.post(set_url, data={"url": desired_url})
         result = response.json()
         logging.info("Set webhook response: %s", result)
@@ -93,7 +93,7 @@ def set_webhook():
 def index():
     return 'Ok'
 
-@app.route(f'/{telegram_token}/', methods=['POST'])
+@app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
 def webhook():
     req = request.get_json()
     logging.info("Received request: %s", req)
