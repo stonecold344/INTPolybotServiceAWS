@@ -110,7 +110,7 @@ def set_webhook():
 def index():
     return 'Ok'
 
-@app.route('/', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == 'POST':
         # Handle incoming POST requests from Telegram here
