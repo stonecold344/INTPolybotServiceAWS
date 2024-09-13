@@ -50,11 +50,11 @@ logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 # Environment Variables
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-YOLO5_URL = 'http:/${yolo5_instance_ip}/yolo5:8081'
+YOLO5_URL = 'http://${yolo5_instance_ip}/yolo5:8081'
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
-
+logging.info(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL)
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
