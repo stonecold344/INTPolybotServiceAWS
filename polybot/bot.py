@@ -146,6 +146,7 @@ class ObjectDetectionBot(Bot):
             return
 
         chat_id = msg['chat']['id']
+        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
 
         if 'text' in msg:
             text = msg['text']
@@ -184,9 +185,15 @@ class ObjectDetectionBot(Bot):
                     self.pending_prediction[chat_id] = False
                     logger.info(f'Reset pending_prediction for chat_id {chat_id}')
 
-                except Exception as e:
-                    logger.error(f"Error processing photo message: {e}")
+                except RuntimeError as e:
+                    logger.error(f"RuntimeError while processing photo message: {e}")
                     self.send_text(chat_id, f"An error occurred: {e}")
+                except TimeoutError as e:
+                    logger.error(f"TimeoutError while uploading to S3: {e}")
+                    self.send_text(chat_id, f"An error occurred: {e}")
+                except Exception as e:
+                    logger.error(f"Unexpected error processing photo message: {e}")
+                    self.send_text(chat_id, f"An unexpected error occurred: {e}")
             else:
                 self.send_text(chat_id, 'Please use the /predict command to analyze this photo.')
                 logger.info(f'No pending prediction for chat_id {chat_id}.')
