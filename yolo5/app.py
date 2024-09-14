@@ -32,26 +32,47 @@ sqs_client = boto3.client('sqs', region_name=AWS_REGION)
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb_client.Table(DYNAMODB_TABLE)
-s3_folder_path = 'aws-project'
 
 with open("/usr/src/app/yolov5/data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
+
 
 def get_img_name_from_url(image_url):
     """Extracts the image name from the URL."""
     path = urlparse(image_url).path
     return path.split('/')[-1]
 
+
+def s3_object_exists(bucket, key):
+    """Checks if an object exists in S3."""
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+        return True
+    except s3_client.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            return False
+        else:
+            logger.error(f"Error checking if object exists in S3: {e}")
+            raise
+
+
 def download_image_from_s3(img_name):
     """Downloads an image from the S3 bucket."""
     local_img_path = f"images/{img_name}"
     os.makedirs(os.path.dirname(local_img_path), exist_ok=True)
+
+    if not s3_object_exists(S3_BUCKET_NAME, img_name):
+        logger.error(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME}")
+        raise FileNotFoundError(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME}")
+
     try:
+        logger.info(f"Downloading {img_name} from S3 bucket {S3_BUCKET_NAME}")
         s3_client.download_file(S3_BUCKET_NAME, img_name, local_img_path)
         return local_img_path
     except Exception as e:
         logger.error(f"Error downloading image from S3: {e}")
         raise
+
 
 def upload_image_to_s3(img_path, img_name):
     """Uploads an image to the S3 bucket."""
@@ -62,6 +83,7 @@ def upload_image_to_s3(img_path, img_name):
         logger.error(f"Error uploading image to S3: {e}")
         raise
 
+
 def store_prediction_in_dynamodb(prediction_summary):
     """Stores the prediction summary in DynamoDB."""
     try:
@@ -70,6 +92,7 @@ def store_prediction_in_dynamodb(prediction_summary):
     except Exception as e:
         logger.error(f"Error storing prediction in DynamoDB: {e}")
         raise
+
 
 def notify_polybot(prediction_id):
     """Notifies Polybot of the prediction completion."""
@@ -81,6 +104,7 @@ def notify_polybot(prediction_id):
     except requests.exceptions.RequestException as e:
         logger.error(f"Error notifying Polybot: {e}")
         raise
+
 
 def consume():
     while True:
@@ -171,6 +195,7 @@ def consume():
         except Exception as e:
             logger.error(f"Error in SQS consume loop: {e}")
             time.sleep(10)  # Wait before retrying
+
 
 if __name__ == "__main__":
     consume()
