@@ -9,6 +9,7 @@ import json
 from dotenv import load_dotenv
 import sys
 from urllib.parse import urlparse
+from decimal import Decimal
 
 sys.path.append('/usr/src/app/yolov5')
 from detect import run
@@ -164,10 +165,10 @@ def consume():
                             labels = [line.split(' ') for line in labels]
                             labels = [{
                                 'class': names[int(l[0])],
-                                'cx': float(l[1]),
-                                'cy': float(l[2]),
-                                'width': float(l[3]),
-                                'height': float(l[4]),
+                                'cx': Decimal(l[1]),
+                                'cy': Decimal(l[2]),
+                                'width': Decimal(l[3]),
+                                'height': Decimal(l[4]),
                             } for l in labels]
 
                         logger.info(f'Prediction summary for {prediction_id}: {labels}')
