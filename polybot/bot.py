@@ -57,7 +57,8 @@ class Bot:
         except Exception as e:
             logger.error(f"Error sending message to chat_id {chat_id}: {e}")
 
-    def is_current_msg_photo(self, msg):
+    @staticmethod
+    def is_current_msg_photo(msg):
         return 'photo' in msg
 
     def download_user_photo(self, msg):

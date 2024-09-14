@@ -157,11 +157,20 @@ def predict():
             logging.error("Missing image_url")
             return jsonify({'error': 'image_url is required'}), 400
 
-        # Queue the prediction job
-        message_body = json.dumps({'image_url': image_url})
-        bot.send_message_to_sqs(message_body)
+        # Call YOLO5 service for prediction
+        responses = requests.post(YOLO5_URL, json={"image_url": image_url})
+        if responses.status_code != 200:
+            logging.error(f"Error from YOLO5 service: {responses.text}")
+            return jsonify({'error': 'Error from YOLO5 service'}), 500
 
-        return jsonify({'status': 'Prediction job queued'}), 200
+        # Process YOLO5 response
+        result = responses.json()
+        prediction_id = result.get('prediction_id')
+        if not prediction_id:
+            logging.error("Missing prediction_id in YOLO5 response")
+            return jsonify({'error': 'Prediction ID not found in YOLO5 response'}), 500
+
+        return jsonify({'prediction_id': prediction_id}), 200
 
     except Exception as e:
         logging.error(f"Error in /predict endpoint: {e}")
