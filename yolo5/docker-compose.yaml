@@ -13,6 +13,7 @@ services:
       SQS_URL: ${SQS_URL}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
