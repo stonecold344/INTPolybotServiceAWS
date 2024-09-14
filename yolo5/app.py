@@ -84,9 +84,17 @@ def consume():
                 message = json.loads(response['Messages'][0]['Body'])
                 receipt_handle = response['Messages'][0]['ReceiptHandle']
 
+                # Log the message to inspect its contents
+                logger.info(f"Received SQS message: {message}")
+
+                # Extract values safely
                 prediction_id = response['Messages'][0]['MessageId']
-                img_name = message['img_name']
-                chat_id = message['chat_id']
+                img_name = message.get('img_name')
+                chat_id = message.get('chat_id')
+
+                if not img_name or not chat_id:
+                    logger.error(f"Missing 'img_name' or 'chat_id' in message: {message}")
+                    continue
 
                 logger.info(f'Prediction {prediction_id} started for image {img_name}')
 
