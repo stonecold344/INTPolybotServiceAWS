@@ -60,14 +60,15 @@ def download_image_from_s3(img_name):
     """Downloads an image from the S3 bucket."""
     local_img_path = f"images/{img_name}"
     os.makedirs(os.path.dirname(local_img_path), exist_ok=True)
+    s3_key = f'docker-project/{img_name}'
 
-    if not s3_object_exists(S3_BUCKET_NAME, img_name):
-        logger.error(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME}")
-        raise FileNotFoundError(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME}")
+    if not s3_object_exists(S3_BUCKET_NAME, s3_key):
+        logger.error(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME} under key {s3_key}")
+        raise FileNotFoundError(f"Image {img_name} not found in S3 bucket {S3_BUCKET_NAME} under key {s3_key}")
 
     try:
-        logger.info(f"Downloading {img_name} from S3 bucket {S3_BUCKET_NAME}")
-        s3_client.download_file(S3_BUCKET_NAME, img_name, local_img_path)
+        logger.info(f"Downloading {img_name} from S3 bucket {S3_BUCKET_NAME} with key {s3_key}")
+        s3_client.download_file(S3_BUCKET_NAME, s3_key, local_img_path)
         return local_img_path
     except Exception as e:
         logger.error(f"Error downloading image from S3: {e}")
@@ -76,9 +77,10 @@ def download_image_from_s3(img_name):
 
 def upload_image_to_s3(img_path, img_name):
     """Uploads an image to the S3 bucket."""
+    s3_key = f'docker-project/{img_name}'
     try:
-        s3_client.upload_file(img_path, S3_BUCKET_NAME, img_name)
-        logger.info(f"Uploaded {img_name} to S3 bucket {S3_BUCKET_NAME}")
+        s3_client.upload_file(img_path, S3_BUCKET_NAME, s3_key)
+        logger.info(f"Uploaded {img_name} to S3 bucket {S3_BUCKET_NAME} under key {s3_key}")
     except Exception as e:
         logger.error(f"Error uploading image to S3: {e}")
         raise
