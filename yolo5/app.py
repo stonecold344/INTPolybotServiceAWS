@@ -1,3 +1,4 @@
+import logging
 import time
 from pathlib import Path
 import yaml
@@ -24,7 +25,9 @@ AWS_REGION = os.getenv('AWS_REGION')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-
+logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN} "
+             f"S3_BUCKET_NAME={S3_BUCKET_NAME},, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
+             f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
 # Ensure all environment variables are loaded
 if not all([SQS_URL, AWS_REGION, TELEGRAM_TOKEN, DYNAMODB_TABLE, S3_BUCKET_NAME]):
     logger.error("One or more environment variables are missing")
