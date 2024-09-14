@@ -146,7 +146,8 @@ class ObjectDetectionBot(Bot):
             return
 
         chat_id = msg['chat']['id']
-        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+        logger.info(
+            f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
 
         if 'text' in msg:
             text = msg['text']
