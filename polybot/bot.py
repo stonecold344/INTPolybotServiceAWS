@@ -141,7 +141,6 @@ class ObjectDetectionBot(Bot):
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
 
-        # Ensure 'chat' and 'id' keys are in the message
         if 'chat' not in msg or 'id' not in msg['chat']:
             logger.error("Message format is incorrect, missing 'chat' or 'id'")
             return
@@ -179,11 +178,7 @@ class ObjectDetectionBot(Bot):
                         'image_url': photo_url,
                         'chat_id': chat_id
                     }
-                    response = self.sqs_client.send_message(
-                        QueueUrl=self.sqs_url,
-                        MessageBody=json.dumps(message_body)
-                    )
-                    logger.info(f'Sent message to SQS with ID: {response.get("MessageId")}')
+                    self.send_message_to_sqs(json.dumps(message_body))
 
                     # Reset the pending state after processing
                     self.pending_prediction[chat_id] = False
