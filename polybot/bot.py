@@ -8,13 +8,47 @@ import uuid
 import requests
 import boto3
 
-
 class Bot:
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
         self.telegram_bot_client = telebot.TeleBot(token)
-        self.telegram_bot_client.remove_webhook()
-        self.telegram_bot_client.set_webhook(url=f'{telegram_chat_url}/{token}/', timeout=60)
+        self.telegram_chat_url = telegram_chat_url
+        self.s3_bucket_name = s3_bucket_name
+        self.yolo5_url = yolo5_url
+        self.aws_region = aws_region
+        self.sqs_url = sqs_url
+        self.setup_webhook(token)
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
+
+    def setup_webhook(self, token):
+        webhook_url = f'{self.telegram_chat_url}/{token}/'
+        try:
+            # Check current webhook info
+            webhook_info = self.telegram_bot_client.get_webhook_info()
+            if webhook_info.url == webhook_url:
+                logger.info("Webhook is already set.")
+                return
+
+            # Remove existing webhook
+            self.telegram_bot_client.remove_webhook()
+
+            # Set new webhook
+            retry_attempts = 5
+            for attempt in range(retry_attempts):
+                try:
+                    self.telegram_bot_client.set_webhook(url=webhook_url, timeout=60)
+                    logger.info("Webhook successfully set.")
+                    return
+                except telebot.apihelper.ApiTelegramException as e:
+                    if e.error_code == 429:  # Rate limit exceeded
+                        retry_after = int(e.result_json.get('parameters', {}).get('retry_after', 1))
+                        logger.info(f"Rate limit exceeded. Retrying after {retry_after} seconds.")
+                        time.sleep(retry_after)
+                    else:
+                        logger.error(f"Error setting webhook: {e}")
+                        break
+                time.sleep(2 ** attempt)  # Exponential backoff
+        except Exception as e:
+            logger.error(f"Error setting up webhook: {e}")
 
     def send_text(self, chat_id, text):
         try:
@@ -59,14 +93,9 @@ class Bot:
         except Exception as e:
             logger.error(f"Error sending photo: {e}")
 
-
 class ObjectDetectionBot(Bot):
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
         super().__init__(token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url)
-        self.s3_bucket_name = s3_bucket_name
-        self.aws_region = aws_region
-        self.sqs_url = sqs_url
-        self.yolo5_url=  yolo5_url
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
         self.sqs_client = boto3.client('sqs', region_name=self.aws_region)
         self.pending_prediction = {}
@@ -82,7 +111,7 @@ class ObjectDetectionBot(Bot):
             self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
 
             # Retry checking for file on S3
-            max_attempts = 1
+            max_attempts = 10
             for attempt in range(max_attempts):
                 response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
                 if 'Contents' in response:
@@ -93,7 +122,7 @@ class ObjectDetectionBot(Bot):
                         f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt + 1}/{max_attempts})")
                     time.sleep(5)
             else:
-                raise TimeoutError("File upload timeout. Could not find file after 10 attempts.")
+                raise TimeoutError("File upload timeout. Could not find file after maximum attempts.")
 
         except Exception as e:
             logger.error(f"Error uploading to S3: {e}")
