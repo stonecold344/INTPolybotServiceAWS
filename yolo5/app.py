@@ -20,7 +20,7 @@ logger.info("Env file loaded")
 # Initialize S3, SQS, and DynamoDB clients
 SQS_URL = os.getenv('SQS_URL')
 AWS_REGION = os.getenv('AWS_REGION')
-polybot_url = os.getenv('POLYBOT_URL')
+polybot_url = os.getenv('TELEGRAM_APP_URL')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
