@@ -8,6 +8,8 @@ import requests
 import json
 from dotenv import load_dotenv
 import sys
+from urllib.parse import urlparse
+
 sys.path.append('/usr/src/app/yolov5')
 from detect import run
 
@@ -34,6 +36,11 @@ s3_folder_path = 'aws-project'
 
 with open("/usr/src/app/yolov5/data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
+
+def get_img_name_from_url(image_url):
+    """Extracts the image name from the URL."""
+    path = urlparse(image_url).path
+    return path.split('/')[-1]
 
 def download_image_from_s3(img_name):
     """Downloads an image from the S3 bucket."""
@@ -89,13 +96,14 @@ def consume():
 
                 # Extract values safely
                 prediction_id = response['Messages'][0]['MessageId']
-                img_name = message.get('img_name')
+                image_url = message.get('image_url')
                 chat_id = message.get('chat_id')
 
-                if not img_name or not chat_id:
-                    logger.error(f"Missing 'img_name' or 'chat_id' in message: {message}")
+                if not image_url or not chat_id:
+                    logger.error(f"Missing 'image_url' or 'chat_id' in message: {message}")
                     continue
 
+                img_name = get_img_name_from_url(image_url)
                 logger.info(f'Prediction {prediction_id} started for image {img_name}')
 
                 try:
