@@ -8,7 +8,7 @@ services:
       - "8081:8081"
     environment:
       AWS_REGION: ${AWS_REGION}
-      DYNAMODB_TABLE: ${DYNAMODB_TABLE} # If required, otherwise remove it
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       SQS_URL: ${SQS_URL}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -16,3 +16,10 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
+    networks:
+      - default
+
+networks:
+  default:
+    external:
+      name: bridge
