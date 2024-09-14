@@ -14,18 +14,19 @@ from decimal import Decimal
 sys.path.append('/usr/src/app/yolov5')
 from detect import run
 
-load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
-logger.info("Env file loaded")
+# Load environment variables
+load_dotenv(dotenv_path='/usr/src/app/.env')
+logger.info("Environment file loaded")
 
 # Initialize S3, SQS, and DynamoDB clients
 SQS_URL = os.getenv('SQS_URL')
 AWS_REGION = os.getenv('AWS_REGION')
-polybot_url = os.getenv('TELEGRAM_APP_URL')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 # Ensure all environment variables are loaded
-if not all([SQS_URL, AWS_REGION, DYNAMODB_TABLE, S3_BUCKET_NAME]):
+if not all([SQS_URL, AWS_REGION, TELEGRAM_TOKEN, DYNAMODB_TABLE, S3_BUCKET_NAME]):
     logger.error("One or more environment variables are missing")
     raise ValueError("One or more environment variables are missing")
 
@@ -34,6 +35,7 @@ s3_client = boto3.client('s3', region_name=AWS_REGION)
 dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb_client.Table(DYNAMODB_TABLE)
 
+# Load labels from YOLO configuration
 with open("/usr/src/app/yolov5/data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
 
@@ -107,15 +109,17 @@ def store_prediction_in_dynamodb(prediction_summary):
         raise
 
 
-def notify_polybot(prediction_id):
-    """Notifies Polybot of the prediction completion."""
-    url = f"{polybot_url}/results?predictionId={prediction_id}"
+def notify_telegram(chat_id, message):
+    """Sends a message directly to a Telegram chat."""
+    telegram_api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': message}
+
     try:
-        response = requests.get(url)
+        response = requests.post(telegram_api_url, data=payload)
         response.raise_for_status()
-        logger.info(f"Notified Polybot of prediction {prediction_id}: {response.status_code}")
+        logger.info(f"Sent message to Telegram chat {chat_id}: {message}")
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error notifying Polybot: {e}")
+        logger.error(f"Error sending message to Telegram: {e}")
         raise
 
 
@@ -193,7 +197,10 @@ def consume():
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
-                        notify_polybot(prediction_id)
+                        message = f"Prediction {prediction_id} results:\n" + "\n".join(
+                            [f"{label['class']}: {label['cx']}, {label['cy']}, {label['width']}, {label['height']}" for
+                             label in labels])
+                        notify_telegram(chat_id, message)
                     else:
                         logger.warning(f'No prediction summary file found for {prediction_id}')
 
