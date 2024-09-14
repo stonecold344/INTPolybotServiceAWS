@@ -42,6 +42,7 @@ if yolo5_instance_ip:
     YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
     logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 else:
+    YOLO5_URL=None
     logging.error("Could not find YOLO5 instance IP")
 
 
