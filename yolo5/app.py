@@ -90,6 +90,16 @@ def upload_image_to_s3(img_path, img_name):
 def store_prediction_in_dynamodb(prediction_summary):
     """Stores the prediction summary in DynamoDB."""
     try:
+        # Convert all float values to Decimal
+        def convert_floats_to_decimal(data):
+            for key, value in data.items():
+                if isinstance(value, float):
+                    data[key] = Decimal(str(value))
+                elif isinstance(value, dict):
+                    convert_floats_to_decimal(value)  # Recursively handle nested dictionaries
+            return data
+
+        prediction_summary = convert_floats_to_decimal(prediction_summary)
         table.put_item(Item=prediction_summary)
         logger.info(f"Stored prediction {prediction_summary['prediction_id']} in DynamoDB")
     except Exception as e:
@@ -179,7 +189,7 @@ def consume():
                             'predicted_img_path': str(predicted_img_path),
                             'labels': labels,
                             'chat_id': chat_id,
-                            'time': time.time()
+                            'time': Decimal(str(time.time()))  # Store time as Decimal
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
