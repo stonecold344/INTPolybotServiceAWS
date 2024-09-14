@@ -159,9 +159,15 @@ class ObjectDetectionBot(Bot):
             else:
                 self.send_text(chat_id, 'Unsupported command. Please use the /predict command with a photo.')
 
+
+            logger.info(
+                f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+
+
+
         elif self.is_current_msg_photo(msg):
             logger.info(f'Received photo message for chat_id {chat_id}')
-            if self.pending_prediction.get(chat_id, False):
+            if self.pending_prediction.get(chat_id):
                 try:
                     # Download the photo from Telegram
                     photo_path = self.download_user_photo(msg)
