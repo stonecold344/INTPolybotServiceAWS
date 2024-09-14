@@ -162,12 +162,15 @@ class ObjectDetectionBot(Bot):
             logger.info(f'Received photo message for chat_id {chat_id}')
             if self.pending_prediction.get(chat_id, False):
                 try:
+                    # Download the photo from Telegram
                     photo_path = self.download_user_photo(msg)
                     logger.info(f'Photo downloaded to: {photo_path}')
 
+                    # Upload the photo to S3
                     photo_name = self.upload_to_s3(photo_path)
                     logger.info(f'Photo uploaded to S3 with name: {photo_name}')
 
+                    # Construct the S3 URL
                     photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
                     logger.info(f'Photo URL: {photo_url}')
 
@@ -197,6 +200,7 @@ class ObjectDetectionBot(Bot):
         else:
             self.send_text(chat_id, 'Unsupported command or message.')
             logger.info(f'Unsupported message type for chat_id {chat_id}.')
+
 
     def queue_prediction_job(self, prediction_id, chat_id):
         message_body = json.dumps({
