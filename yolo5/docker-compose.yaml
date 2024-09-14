@@ -16,10 +16,3 @@ services:
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
-    networks:
-      - default
-
-networks:
-  default:
-    external:
-      name: bridge

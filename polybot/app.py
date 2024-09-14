@@ -157,20 +157,18 @@ def predict():
             logging.error("Missing image_url")
             return jsonify({'error': 'image_url is required'}), 400
 
-        # Call YOLO5 service for prediction
-        responses = requests.post(YOLO5_URL, json={"image_url": image_url})
-        if responses.status_code != 200:
-            logging.error(f"Error from YOLO5 service: {responses.text}")
-            return jsonify({'error': 'Error from YOLO5 service'}), 500
+        # Send a message to SQS with the necessary information
+        message_body = json.dumps({
+            'image_url': image_url,
+            'chat_id': req.get('chat_id')
+        })
+        responses = boto3.client('sqs', region_name=AWS_REGION).send_message(
+            QueueUrl=SQS_URL,
+            MessageBody=message_body
+        )
 
-        # Process YOLO5 response
-        result = responses.json()
-        prediction_id = result.get('prediction_id')
-        if not prediction_id:
-            logging.error("Missing prediction_id in YOLO5 response")
-            return jsonify({'error': 'Prediction ID not found in YOLO5 response'}), 500
-
-        return jsonify({'prediction_id': prediction_id}), 200
+        logging.info(f"Message sent to SQS with ID: {responses.get('MessageId')}")
+        return jsonify({'message': 'Prediction job queued successfully'}), 200
 
     except Exception as e:
         logging.error(f"Error in /predict endpoint: {e}")
