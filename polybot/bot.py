@@ -20,7 +20,7 @@ class Bot:
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
 
     def setup_webhook(self, token):
-        webhook_url = f'{self.telegram_chat_url}/{token}/'
+        webhook_url = f'{self.telegram_chat_url}/{token}/'  # Make sure HTTPS is used for production
         try:
             # Check current webhook info
             webhook_info = self.telegram_bot_client.get_webhook_info()
@@ -129,14 +129,22 @@ class ObjectDetectionBot(Bot):
             raise
 
     def send_message_to_sqs(self, message_body):
-        try:
-            response = self.sqs_client.send_message(
-                QueueUrl=self.sqs_url,
-                MessageBody=message_body
-            )
-            logger.info(f"Message sent to SQS: {response.get('MessageId')}")
-        except Exception as e:
-            logger.error(f"Error sending message to SQS: {e}")
+        retry_attempts = 5
+        for attempt in range(retry_attempts):
+            try:
+                response = self.sqs_client.send_message(
+                    QueueUrl=self.sqs_url,
+                    MessageBody=message_body
+                )
+                logger.info(f"Message sent to SQS: {response.get('MessageId')}")
+                return
+            except Exception as e:
+                if attempt < retry_attempts - 1:
+                    logger.error(f"Error sending message to SQS, retrying... (Attempt {attempt+1}/{retry_attempts})")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    logger.error(f"Error sending message to SQS: {e}")
+                    raise
 
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
@@ -150,63 +158,58 @@ class ObjectDetectionBot(Bot):
             f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
 
         if 'text' in msg:
-            text = msg['text']
-            logger.info(f'Received text message: {text}')
-            if text.startswith('/predict'):
-                self.pending_prediction[chat_id] = True
-                self.send_text(chat_id, 'Please send a photo to analyze.')
-                logger.info(f'Set pending_prediction for chat_id {chat_id} to True')
-            else:
-                self.send_text(chat_id, 'Unsupported command. Please use the /predict command with a photo.')
-
-
-            logger.info(
-                f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
-
-
-
+            self.handle_text_message(chat_id, msg['text'])
         elif self.is_current_msg_photo(msg):
-            logger.info(f'Received photo message for chat_id {chat_id}')
-            if self.pending_prediction.get(chat_id):
-                try:
-                    # Download the photo from Telegram
-                    photo_path = self.download_user_photo(msg)
-                    logger.info(f'Photo downloaded to: {photo_path}')
-
-                    # Upload the photo to S3
-                    photo_name = self.upload_to_s3(photo_path)
-                    logger.info(f'Photo uploaded to S3 with name: {photo_name}')
-
-                    # Construct the S3 URL
-                    photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
-                    logger.info(f'Photo URL: {photo_url}')
-
-                    # Send a message to SQS with the photo URL and chat ID
-                    message_body = {
-                        'image_url': photo_url,
-                        'chat_id': chat_id
-                    }
-                    self.send_message_to_sqs(json.dumps(message_body))
-
-                    # Reset the pending state after processing
-                    self.pending_prediction[chat_id] = False
-                    logger.info(f'Reset pending_prediction for chat_id {chat_id}')
-
-                except RuntimeError as e:
-                    logger.error(f"RuntimeError while processing photo message: {e}")
-                    self.send_text(chat_id, f"An error occurred: {e}")
-                except TimeoutError as e:
-                    logger.error(f"TimeoutError while uploading to S3: {e}")
-                    self.send_text(chat_id, f"An error occurred: {e}")
-                except Exception as e:
-                    logger.error(f"Unexpected error processing photo message: {e}")
-                    self.send_text(chat_id, f"An unexpected error occurred: {e}")
-            else:
-                self.send_text(chat_id, 'Please use the /predict command to analyze this photo.')
-                logger.info(f'No pending prediction for chat_id {chat_id}.')
+            self.handle_photo_message(chat_id, msg)
         else:
             self.send_text(chat_id, 'Unsupported command or message.')
             logger.info(f'Unsupported message type for chat_id {chat_id}.')
+
+    def handle_text_message(self, chat_id, text):
+        logger.info(f'Received text message: {text}')
+        if text.startswith('/predict'):
+            self.pending_prediction[chat_id] = True
+            self.send_text(chat_id, 'Please send a photo to analyze.')
+            logger.info(f'Set pending_prediction for chat_id {chat_id} to True')
+        else:
+            self.send_text(chat_id, 'Unsupported command. Please use the /predict command with a photo.')
+
+    def handle_photo_message(self, chat_id, msg):
+        logger.info(f'Received photo message for chat_id {chat_id}')
+        if self.pending_prediction.get(chat_id):
+            try:
+                # Download the photo from Telegram
+                photo_path = self.download_user_photo(msg)
+                logger.info(f'Photo downloaded to: {photo_path}')
+
+                # Upload the photo to S3
+                photo_name = self.upload_to_s3(photo_path)
+                logger.info(f'Photo uploaded to S3 with name: {photo_name}')
+
+                # Construct the S3 URL
+                photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
+                logger.info(f'Photo URL: {photo_url}')
+
+                # Send a message to SQS with the photo URL and chat ID
+                message_body = {
+                    'image_url': photo_url,
+                    'chat_id': chat_id
+                }
+                self.send_message_to_sqs(json.dumps(message_body))
+
+                # Reset the pending state after processing
+                self.pending_prediction[chat_id] = False
+                logger.info(f'Reset pending_prediction for chat_id {chat_id}')
+
+            except (RuntimeError, TimeoutError) as e:
+                logger.error(f"Error occurred: {e}")
+                self.send_text(chat_id, f"An error occurred: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                self.send_text(chat_id, f"An unexpected error occurred: {e}")
+        else:
+            self.send_text(chat_id, 'Please use the /predict command to analyze this photo.')
+            logger.info(f'No pending prediction for chat_id {chat_id}.')
 
     def queue_prediction_job(self, prediction_id, chat_id):
         message_body = json.dumps({
@@ -217,4 +220,5 @@ class ObjectDetectionBot(Bot):
             self.send_message_to_sqs(message_body)
             logger.info(f"Prediction job queued with ID: {prediction_id}")
         except Exception as e:
-            logger.error(f"Error queuing prediction job: {e}")
+            logger.error(f"Error queueing prediction job: {e}")
+
