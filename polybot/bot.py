@@ -174,23 +174,21 @@ class ObjectDetectionBot(Bot):
                     photo_url = f'https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{photo_name}'
                     logger.info(f'Photo URL: {photo_url}')
 
-                    # Call YOLO5 for object detection
-                    yolo5_response = requests.post(self.yolo5_url, json={"image_url": photo_url})
-                    if yolo5_response.status_code == 200:
-                        result = yolo5_response.json()
-                        prediction_id = result.get('prediction_id')
-                        if prediction_id:
-                            self.send_text(chat_id, f"Prediction ID: {prediction_id}")
-                            # Queue the prediction job
-                            self.queue_prediction_job(prediction_id, chat_id)
-                        else:
-                            self.send_text(chat_id, "Failed to get prediction ID.")
-                    else:
-                        self.send_text(chat_id, "Error processing image.")
+                    # Send a message to SQS with the photo URL and chat ID
+                    message_body = {
+                        'image_url': photo_url,
+                        'chat_id': chat_id
+                    }
+                    response = self.sqs_client.send_message(
+                        QueueUrl=self.sqs_url,
+                        MessageBody=json.dumps(message_body)
+                    )
+                    logger.info(f'Sent message to SQS with ID: {response.get("MessageId")}')
 
                     # Reset the pending state after processing
                     self.pending_prediction[chat_id] = False
                     logger.info(f'Reset pending_prediction for chat_id {chat_id}')
+
                 except Exception as e:
                     logger.error(f"Error processing photo message: {e}")
                     self.send_text(chat_id, f"An error occurred: {e}")
@@ -200,7 +198,6 @@ class ObjectDetectionBot(Bot):
         else:
             self.send_text(chat_id, 'Unsupported command or message.')
             logger.info(f'Unsupported message type for chat_id {chat_id}.')
-
 
     def queue_prediction_job(self, prediction_id, chat_id):
         message_body = json.dumps({
