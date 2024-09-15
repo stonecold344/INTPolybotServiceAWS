@@ -212,7 +212,7 @@ def consume():
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
-                        formatted_message = f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels)
+                        logger.info(f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels))
                         notify_telegram(chat_id, message)
                     else:
                         logger.warning(f'No prediction summary file found for {prediction_id}')
