@@ -201,24 +201,8 @@ class ObjectDetectionBot(Bot):
                 self.pending_prediction[chat_id] = False
                 logger.info(f'Reset pending_prediction for chat_id {chat_id}')
 
-            except (RuntimeError, TimeoutError) as e:
-                logger.error(f"Error occurred: {e}")
-                self.send_text(chat_id, f"An error occurred: {e}")
             except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-                self.send_text(chat_id, f"An unexpected error occurred: {e}")
-        else:
-            self.send_text(chat_id, 'Please use the /predict command to analyze this photo.')
-            logger.info(f'No pending prediction for chat_id {chat_id}.')
+                self.send_text(chat_id, 'An error occurred while processing your photo. Please try again.')
+                logger.error(f"Error handling photo message: {e}")
 
-    def queue_prediction_job(self, prediction_id, chat_id):
-        message_body = json.dumps({
-            'prediction_id': prediction_id,
-            'chat_id': chat_id
-        })
-        try:
-            self.send_message_to_sqs(message_body)
-            logger.info(f"Prediction job queued with ID: {prediction_id}")
-        except Exception as e:
-            logger.error(f"Error queueing prediction job: {e}")
 
