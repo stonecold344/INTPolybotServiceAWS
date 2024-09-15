@@ -108,6 +108,23 @@ def store_prediction_in_dynamodb(prediction_summary):
         logger.error(f"Error storing prediction in DynamoDB: {e}")
         raise
 
+def format_prediction_summary(labels):
+    """Formats prediction results to show object counts."""
+    # Initialize a dictionary to keep counts
+    object_counts = {}
+
+    # Count occurrences of each object
+    for label in labels:
+        object_name = label['class']
+        if object_name in object_counts:
+            object_counts[object_name] += 1
+        else:
+            object_counts[object_name] = 1
+
+    # Construct the result message
+    result_lines = [f"{object_name}:{count}" for object_name, count in object_counts.items()]
+    return "\n".join(result_lines)
+
 def notify_telegram(chat_id, message):
     """Sends a message directly to a Telegram chat."""
     telegram_api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -195,9 +212,8 @@ def consume():
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
-                        message = f"Prediction {prediction_id} results:\n" + "\n".join(
-                            [f"{label['class']}: {label['cx']}, {label['cy']}, {label['width']}, {label['height']}" for
-                             label in labels])
+                        formatted_message = f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels)
+                        store_prediction_in_dynamodb(prediction_summary)
                         notify_telegram(chat_id, message)
                     else:
                         logger.warning(f'No prediction summary file found for {prediction_id}')
