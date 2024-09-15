@@ -19,10 +19,28 @@ from detect import run
 load_dotenv(dotenv_path='/usr/src/app/.env')
 logger.info("Environment file loaded")
 
+def get_secret(secret_id):
+    session = boto3.session.Session()
+    logging.info(session.get_credentials())
+    client = session.client(service_name='secretsmanager', region_name='eu-west-3')
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_id)
+        secret = get_secret_value_response['SecretString']
+        return json.loads(secret)
+    except Exception as e:
+        logging.error(f"Error retrieving secret: {e}")
+        raise e
+
+# Retrieve the Telegram token
+SECRET_ID = "telegram/token"
+secrets = get_secret(SECRET_ID)
+TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
+
+
 # Initialize S3, SQS, and DynamoDB clients
 SQS_URL = os.getenv('SQS_URL')
 AWS_REGION = os.getenv('AWS_REGION')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
@@ -212,8 +230,8 @@ def consume():
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
-                        logger.info(f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels))
-                        notify_telegram(chat_id, message)
+                        formatted_message = f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels)
+                        notify_telegram(chat_id, formatted_message)
                     else:
                         logger.warning(f'No prediction summary file found for {prediction_id}')
 
