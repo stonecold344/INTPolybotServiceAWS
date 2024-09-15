@@ -20,11 +20,11 @@ load_dotenv(dotenv_path='/usr/src/app/.env')
 logger.info("Environment file loaded")
 
 # Initialize S3, SQS, and DynamoDB clients
-SQS_URL = os.getenv('SQS_URL')
-AWS_REGION = os.getenv('AWS_REGION')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+AWS_REGION = os.getenv('AWS_REGION')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+SQS_URL = os.getenv('SQS_URL')
 
 
 logger.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN} "
