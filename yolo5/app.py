@@ -26,10 +26,6 @@ DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 SQS_URL = os.getenv('SQS_URL')
 
-
-logger.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN} "
-             f"S3_BUCKET_NAME={S3_BUCKET_NAME},DYNAMODB_TABLE={DYNAMODB_TABLE}, "
-             f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
 # Ensure all environment variables are loaded
 if not all([SQS_URL, AWS_REGION, TELEGRAM_TOKEN, DYNAMODB_TABLE, S3_BUCKET_NAME]):
     logger.error("One or more environment variables are missing")
@@ -44,12 +40,10 @@ table = dynamodb_client.Table(DYNAMODB_TABLE)
 with open("/usr/src/app/yolov5/data/coco128.yaml", "r") as stream:
     names = yaml.safe_load(stream)['names']
 
-
 def get_img_name_from_url(image_url):
     """Extracts the image name from the URL."""
     path = urlparse(image_url).path
     return path.split('/')[-1]
-
 
 def s3_object_exists(bucket, key):
     """Checks if an object exists in S3."""
@@ -59,10 +53,8 @@ def s3_object_exists(bucket, key):
     except s3_client.exceptions.ClientError as e:
         if e.response['Error']['Code'] == '404':
             return False
-        else:
-            logger.error(f"Error checking if object exists in S3: {e}")
-            raise
-
+        logger.error(f"Error checking if object exists in S3: {e}")
+        raise
 
 def download_image_from_s3(img_name):
     """Downloads an image from the S3 bucket."""
@@ -82,7 +74,6 @@ def download_image_from_s3(img_name):
         logger.error(f"Error downloading image from S3: {e}")
         raise
 
-
 def upload_image_to_s3(img_path, img_name):
     """Uploads an image to the S3 bucket."""
     s3_key = f'docker-project/{img_name}'
@@ -93,18 +84,19 @@ def upload_image_to_s3(img_path, img_name):
         logger.error(f"Error uploading image to S3: {e}")
         raise
 
-
 def store_prediction_in_dynamodb(prediction_summary):
     """Stores the prediction summary in DynamoDB."""
     try:
         # Convert all float values to Decimal
         def convert_floats_to_decimal(data):
-            for key, value in data.items():
-                if isinstance(value, float):
-                    data[key] = Decimal(str(value))
-                elif isinstance(value, dict):
-                    convert_floats_to_decimal(value)  # Recursively handle nested dictionaries
-            return data
+            if isinstance(data, dict):
+                return {k: convert_floats_to_decimal(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_floats_to_decimal(i) for i in data]
+            elif isinstance(data, float):
+                return Decimal(str(data))
+            else:
+                return data
 
         prediction_summary = convert_floats_to_decimal(prediction_summary)
         table.put_item(Item=prediction_summary)
@@ -112,7 +104,6 @@ def store_prediction_in_dynamodb(prediction_summary):
     except Exception as e:
         logger.error(f"Error storing prediction in DynamoDB: {e}")
         raise
-
 
 def notify_telegram(chat_id, message):
     """Sends a message directly to a Telegram chat."""
@@ -126,7 +117,6 @@ def notify_telegram(chat_id, message):
     except requests.exceptions.RequestException as e:
         logger.error(f"Error sending message to Telegram: {e}")
         raise
-
 
 def consume():
     while True:
@@ -220,7 +210,6 @@ def consume():
         except Exception as e:
             logger.error(f"Error in SQS consume loop: {e}")
             time.sleep(10)  # Wait before retrying
-
 
 if __name__ == "__main__":
     consume()
