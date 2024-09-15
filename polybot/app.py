@@ -12,7 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables from the .env file
-load_dotenv(dotenv_path='/usr/src/app/.env')  # Ensure the correct path for your environment
+load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
 logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
@@ -30,7 +30,6 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
-# Fetching YOLO5 instance IP from EC2
 yolo5_instance_ip = {}
 ec2 = boto3.client('ec2', region_name='eu-west-3')
 response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
@@ -43,8 +42,9 @@ if yolo5_instance_ip:
     YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
     logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 else:
-    YOLO5_URL = None
+    YOLO5_URL=None
     logging.error("Could not find YOLO5 instance IP")
+
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -60,11 +60,9 @@ S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
-
 logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
              f"S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
              f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
-
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
@@ -90,21 +88,21 @@ def set_webhook():
         desired_url = f"{TELEGRAM_APP_URL}/{TELEGRAM_TOKEN}/"
 
         if current_url == desired_url:
-            logging.info(f"Webhook is already set to the desired URL: {current_url}")
+            logging.info("Webhook is already set to the desired URL: %s", current_url)
             return
         else:
-            logging.info(f"Setting webhook as it is not set or has a different URL. Current webhook URL: {current_url}")
+            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
 
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
         responses = requests.post(set_url, data={"url": desired_url})
         result = responses.json()
-        logging.info(f"Set webhook response: {result}")
+        logging.info("Set webhook response: %s", result)
 
         if result.get('ok'):
             logging.info("Webhook set successfully")
         else:
-            logging.error(f"Failed to set webhook: {result}")
+            logging.error("Failed to set webhook: %s", result)
 
     except Exception as e:
         logging.error(f"Error occurred while setting webhook: {e}")
@@ -116,7 +114,7 @@ def index():
 @app.route(f'/{TELEGRAM_TOKEN}/', methods=['POST'])
 def webhook():
     req = request.get_json()
-    logging.info(f"Received request: {req}")
+    logging.info("Received request: %s", req)
     if req is None:
         logging.warning("Received empty request payload")
         return jsonify({'error': 'Empty request payload'}), 400
@@ -135,7 +133,6 @@ def results():
         if 'Item' not in responses:
             logging.error(f"Prediction not found for ID: {prediction_id}")
             return jsonify({'error': 'Prediction not found'}), 404
-
         prediction_summary = responses['Item']
         chat_id = prediction_summary['chat_id']
         labels = prediction_summary['labels']

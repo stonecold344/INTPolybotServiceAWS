@@ -218,7 +218,7 @@ class ObjectDetectionBot(Bot):
         })
         try:
             self.send_message_to_sqs(message_body)
-            logger.info(f"Prediction job queued: {message_body}")
+            logger.info(f"Prediction job queued with ID: {prediction_id}")
         except Exception as e:
-            logger.error(f"Error queuing prediction job: {e}")
+            logger.error(f"Error queueing prediction job: {e}")
 
