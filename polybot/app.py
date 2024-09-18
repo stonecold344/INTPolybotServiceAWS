@@ -32,7 +32,7 @@ def get_secret(secret_id):
 
 yolo5_instance_ip = {}
 ec2 = boto3.client('ec2', region_name='eu-west-3')
-response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}])
+response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}, {'Name': 'instance-state-name', 'Values': ['running']}])
 for reservation in response['Reservations']:
     for instance in reservation['Instances']:
         yolo5_instance_ip = instance.get('PublicIpAddress')
