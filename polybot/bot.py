@@ -190,14 +190,16 @@ class ObjectDetectionBot(Bot):
                 # Process each image and send it to SQS
                 s3_object = self.upload_to_s3(photo_path)
                 logger.info(f'Image uploaded to S3: {s3_object}')
+                time.sleep(5)
 
                 message = json.dumps({
                     'chat_id': chat_id,
                     'image_url': s3_object
                 })
                 self.send_message_to_sqs(message)
-                self.send_text(chat_id, "Image has been uploaded and is being processed.")
                 logger.info(f"Image processed for chat_id {chat_id}")
+            self.pending_prediction[chat_id] = False
+            logger.info(f'Reset pending_prediction for chat_id {chat_id}')
 
         except (RuntimeError, TimeoutError) as e:
             logger.error(f"Error occurred: {e}")
