@@ -2,12 +2,11 @@ import telebot
 from loguru import logger
 import os
 import time
-from telebot.types import InputFile
 import json
 import uuid
-import requests
 import boto3
-
+from telebot.types import InputFile
+from botocore.exceptions import ClientError
 
 class Bot:
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
@@ -29,9 +28,7 @@ class Bot:
                 return
 
             self.telegram_bot_client.remove_webhook()
-
-            retry_attempts = 5
-            for attempt in range(retry_attempts):
+            for attempt in range(5):
                 try:
                     self.telegram_bot_client.set_webhook(url=webhook_url, timeout=60)
                     logger.info("Webhook successfully set.")
@@ -70,8 +67,7 @@ class Bot:
         file_info = self.telegram_bot_client.get_file(photo_id)
         data = self.telegram_bot_client.download_file(file_info.file_path)
         folder_name = file_info.file_path.split('/')[0]
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
+        os.makedirs(folder_name, exist_ok=True)
         file_path = os.path.join(folder_name, os.path.basename(file_info.file_path))
         with open(file_path, 'wb') as photo:
             photo.write(data)
@@ -80,7 +76,8 @@ class Bot:
 
     def send_photo(self, chat_id, img_path):
         if not os.path.exists(img_path):
-            raise RuntimeError("Image path doesn't exist")
+            logger.error(f"Image path {img_path} doesn't exist")
+            return
 
         try:
             self.telegram_bot_client.send_photo(chat_id, InputFile(img_path))
@@ -102,35 +99,32 @@ class ObjectDetectionBot(Bot):
         unique_id = uuid.uuid4()
         object_name = f'docker-project/photos_{unique_id}_{file_name}'
 
-        retry_attempts = 3
-        for attempts in range(retry_attempts):
+        for attempt in range(3):
             try:
                 logger.info(f'Uploading file to S3: {file_path}')
                 self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
 
-                max_attempts = 10
-                for attempt in range(max_attempts):
+                for retry in range(10):
                     response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
                     if 'Contents' in response:
                         logger.info("File is available on S3")
                         return object_name
-                    else:
-                        logger.info(
-                            f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt + 1}/{max_attempts})")
-                        time.sleep(5)
-                else:
-                    raise TimeoutError("File upload timeout. Could not find file after maximum attempts.")
+                    logger.info(f"File not available on S3 yet, retrying in 5 seconds... (Attempt {retry + 1}/10)")
+                    time.sleep(5)
+                raise TimeoutError("File upload timeout. Could not find file after maximum attempts.")
 
+            except ClientError as e:
+                logger.error(f"ClientError: {e}")
+                raise
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
-                if attempts < retry_attempts - 1:
-                    time.sleep(2 ** attempts)
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
                 else:
                     raise
 
     def send_message_to_sqs(self, message_body):
-        retry_attempts = 5
-        for attempt in range(retry_attempts):
+        for attempt in range(5):
             try:
                 response = self.sqs_client.send_message(
                     QueueUrl=self.sqs_url,
@@ -138,12 +132,14 @@ class ObjectDetectionBot(Bot):
                 )
                 logger.info(f"Message sent to SQS: {response.get('MessageId')}")
                 return
+            except ClientError as e:
+                logger.error(f"ClientError: {e}")
+                raise
             except Exception as e:
-                if attempt < retry_attempts - 1:
-                    logger.error(f"Error sending message to SQS, retrying... (Attempt {attempt + 1}/{retry_attempts})")
+                logger.error(f"Error sending message to SQS, retrying... (Attempt {attempt + 1}/5)")
+                if attempt < 4:
                     time.sleep(2 ** attempt)
                 else:
-                    logger.error(f"Error sending message to SQS: {e}")
                     raise
 
     def handle_message(self, msg):
@@ -154,8 +150,7 @@ class ObjectDetectionBot(Bot):
             return
 
         chat_id = msg['chat']['id']
-        logger.info(
-            f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
 
         if 'text' in msg:
             self.handle_text_message(chat_id, msg['text'])
@@ -182,15 +177,12 @@ class ObjectDetectionBot(Bot):
             return
 
         try:
-            # Loop through all photos in the message
             for photo in msg['photo']:
                 photo_path = self.download_user_photo(photo['file_id'])
                 logger.info(f'Photo downloaded to: {photo_path}')
 
-                # Process each image and send it to SQS
                 s3_object = self.upload_to_s3(photo_path)
                 logger.info(f'Image uploaded to S3: {s3_object}')
-                time.sleep(5)
 
                 message = json.dumps({
                     'chat_id': chat_id,
@@ -198,6 +190,7 @@ class ObjectDetectionBot(Bot):
                 })
                 self.send_message_to_sqs(message)
                 logger.info(f"Image processed for chat_id {chat_id}")
+
             self.pending_prediction[chat_id] = False
             logger.info(f'Reset pending_prediction for chat_id {chat_id}')
 
