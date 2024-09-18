@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IPS: 52.47.101.198,35.180.44.22  # Add more IPs as needed
+  EC2_PUBLIC_IPS: 35.180.23.236,52.47.114.233  # Add more IPs as needed
 
 jobs:
   Build:
