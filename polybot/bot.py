@@ -5,6 +5,7 @@ import time
 from telebot.types import InputFile
 import json
 import uuid
+import requests
 import boto3
 
 
@@ -63,15 +64,15 @@ class Bot:
 
     @staticmethod
     def is_current_msg_photo(msg):
-        return hasattr(msg, 'photo')
+        return 'photo' in msg
 
     def download_user_photo(self, msg):
         if not self.is_current_msg_photo(msg):
             raise RuntimeError("Message content of type 'photo' expected")
 
-        file_info = self.telegram_bot_client.get_file(msg.photo[-1].file_id)
+        file_info = self.telegram_bot_client.get_file(msg['photo'][-1]['file_id'])
         data = self.telegram_bot_client.download_file(file_info.file_path)
-        folder_name = 'photos'
+        folder_name = file_info.file_path.split('/')[0]
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
         file_path = os.path.join(folder_name, os.path.basename(file_info.file_path))
@@ -105,23 +106,32 @@ class ObjectDetectionBot(Bot):
         object_name = f'docker-project/photos_{unique_id}_{file_name}'
 
         retry_attempts = 3
-        for attempt in range(retry_attempts):
+        for attempts in range(retry_attempts):
             try:
                 logger.info(f'Uploading file to S3: {file_path}')
                 self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
-                logger.info("File successfully uploaded to S3")
-                return object_name
+
+                max_attempts = 10
+                for attempt in range(max_attempts):
+                    response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
+                    if 'Contents' in response:
+                        logger.info("File is available on S3")
+                        return object_name
+                    else:
+                        logger.info(
+                            f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt + 1}/{max_attempts})")
+                        time.sleep(5)
+                else:
+                    raise TimeoutError("File upload timeout. Could not find file after maximum attempts.")
+
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
-                if attempt < retry_attempts - 1:
-                    time.sleep(2 ** attempt)
+                if attempts < retry_attempts - 1:
+                    time.sleep(2 ** attempts)
                 else:
                     raise
 
     def send_message_to_sqs(self, message_body):
-        if isinstance(message_body, dict):
-            message_body = json.dumps(message_body)
-
         retry_attempts = 5
         for attempt in range(retry_attempts):
             try:
@@ -142,11 +152,16 @@ class ObjectDetectionBot(Bot):
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
 
-        chat_id = msg.chat.id
-        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+        if 'chat' not in msg or 'id' not in msg['chat']:
+            logger.error("Message format is incorrect, missing 'chat' or 'id'")
+            return
 
-        if hasattr(msg, 'text'):
-            self.handle_text_message(chat_id, msg.text)
+        chat_id = msg['chat']['id']
+        logger.info(
+            f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+
+        if 'text' in msg:
+            self.handle_text_message(chat_id, msg['text'])
         elif self.is_current_msg_photo(msg):
             self.handle_photo_message(chat_id, msg)
         else:
@@ -173,13 +188,14 @@ class ObjectDetectionBot(Bot):
             photo_path = self.download_user_photo(msg)
             logger.info(f'Photo downloaded to: {photo_path}')
 
+            # Process image immediately after receiving it
             s3_object = self.upload_to_s3(photo_path)
             logger.info(f'Image uploaded to S3: {s3_object}')
 
-            message = {
+            message = json.dumps({
                 'chat_id': chat_id,
                 'image_path': s3_object
-            }
+            })
             self.send_message_to_sqs(message)
             self.send_text(chat_id, "Image has been uploaded and is being processed.")
             logger.info(f"Image processed for chat_id {chat_id}")
