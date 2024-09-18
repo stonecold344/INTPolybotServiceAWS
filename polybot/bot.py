@@ -66,11 +66,8 @@ class Bot:
     def is_current_msg_photo(msg):
         return 'photo' in msg
 
-    def download_user_photo(self, msg):
-        if not self.is_current_msg_photo(msg):
-            raise RuntimeError("Message content of type 'photo' expected")
-
-        file_info = self.telegram_bot_client.get_file(msg['photo'][-1]['file_id'])
+    def download_user_photo(self, photo_id):
+        file_info = self.telegram_bot_client.get_file(photo_id)
         data = self.telegram_bot_client.download_file(file_info.file_path)
         folder_name = file_info.file_path.split('/')[0]
         if not os.path.exists(folder_name):
@@ -185,20 +182,22 @@ class ObjectDetectionBot(Bot):
             return
 
         try:
-            photo_path = self.download_user_photo(msg)
-            logger.info(f'Photo downloaded to: {photo_path}')
+            # Loop through all photos in the message
+            for photo in msg['photo']:
+                photo_path = self.download_user_photo(photo['file_id'])
+                logger.info(f'Photo downloaded to: {photo_path}')
 
-            # Process image immediately after receiving it
-            s3_object = self.upload_to_s3(photo_path)
-            logger.info(f'Image uploaded to S3: {s3_object}')
+                # Process each image and send it to SQS
+                s3_object = self.upload_to_s3(photo_path)
+                logger.info(f'Image uploaded to S3: {s3_object}')
 
-            message = json.dumps({
-                'chat_id': chat_id,
-                'image_url': s3_object
-            })
-            self.send_message_to_sqs(message)
-            self.send_text(chat_id, "Image has been uploaded and is being processed.")
-            logger.info(f"Image processed for chat_id {chat_id}")
+                message = json.dumps({
+                    'chat_id': chat_id,
+                    'image_url': s3_object
+                })
+                self.send_message_to_sqs(message)
+                self.send_text(chat_id, "Image has been uploaded and is being processed.")
+                logger.info(f"Image processed for chat_id {chat_id}")
 
         except (RuntimeError, TimeoutError) as e:
             logger.error(f"Error occurred: {e}")
