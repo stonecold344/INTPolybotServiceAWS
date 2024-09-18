@@ -63,15 +63,15 @@ class Bot:
 
     @staticmethod
     def is_current_msg_photo(msg):
-        return 'photo' in msg
+        return hasattr(msg, 'photo')
 
     def download_user_photo(self, msg):
         if not self.is_current_msg_photo(msg):
             raise RuntimeError("Message content of type 'photo' expected")
 
-        file_info = self.telegram_bot_client.get_file(msg['photo'][-1]['file_id'])
+        file_info = self.telegram_bot_client.get_file(msg.photo[-1].file_id)
         data = self.telegram_bot_client.download_file(file_info.file_path)
-        folder_name = file_info.file_path.split('/')[0]
+        folder_name = 'photos'
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
         file_path = os.path.join(folder_name, os.path.basename(file_info.file_path))
@@ -109,21 +109,8 @@ class ObjectDetectionBot(Bot):
             try:
                 logger.info(f'Uploading file to S3: {file_path}')
                 self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
-
-                # Wait for the file to be available on S3
-                max_attempts = 10
-                for attempt in range(max_attempts):
-                    response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
-                    if 'Contents' in response:
-                        logger.info("File is available on S3")
-                        return object_name
-                    else:
-                        logger.info(
-                            f"File is not available on S3 yet, retrying in 5 seconds... (Attempt {attempt + 1}/{max_attempts})")
-                        time.sleep(5)
-                else:
-                    raise TimeoutError("File upload timeout. Could not find file after maximum attempts.")
-
+                logger.info("File successfully uploaded to S3")
+                return object_name
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
                 if attempt < retry_attempts - 1:
@@ -132,7 +119,6 @@ class ObjectDetectionBot(Bot):
                     raise
 
     def send_message_to_sqs(self, message_body):
-        # Ensure message_body is a JSON string
         if isinstance(message_body, dict):
             message_body = json.dumps(message_body)
 
@@ -156,16 +142,11 @@ class ObjectDetectionBot(Bot):
     def handle_message(self, msg):
         logger.info(f'Handling message: {msg}')
 
-        if 'chat' not in msg or 'id' not in msg['chat']:
-            logger.error("Message format is incorrect, missing 'chat' or 'id'")
-            return
+        chat_id = msg.chat.id
+        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
 
-        chat_id = msg['chat']['id']
-        logger.info(
-            f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
-
-        if 'text' in msg:
-            self.handle_text_message(chat_id, msg['text'])
+        if hasattr(msg, 'text'):
+            self.handle_text_message(chat_id, msg.text)
         elif self.is_current_msg_photo(msg):
             self.handle_photo_message(chat_id, msg)
         else:
@@ -192,7 +173,6 @@ class ObjectDetectionBot(Bot):
             photo_path = self.download_user_photo(msg)
             logger.info(f'Photo downloaded to: {photo_path}')
 
-            # Process image immediately after receiving it
             s3_object = self.upload_to_s3(photo_path)
             logger.info(f'Image uploaded to S3: {s3_object}')
 
