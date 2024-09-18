@@ -186,7 +186,7 @@ class ObjectDetectionBot(Bot):
 
     def handle_photo_message(self, chat_id, msg):
         logger.info(f'Received photo message for chat_id {chat_id}')
-        if not self.pending_prediction.get(chat_id, False):
+        if not self.pending_prediction.get(chat_id, True):
             self.send_text(chat_id, 'Please use the /predict command before sending photos.')
             logger.info(f'Ignored photo message for chat_id {chat_id} as no prediction is pending.')
             return
