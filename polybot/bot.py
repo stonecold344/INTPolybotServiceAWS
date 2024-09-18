@@ -21,7 +21,7 @@ class Bot:
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
 
     def setup_webhook(self, token):
-        webhook_url = f'{self.telegram_chat_url}/{token}/'  # Make sure HTTPS is used for production
+        webhook_url = f'{self.telegram_chat_url}/{token}/'
         try:
             webhook_info = self.telegram_bot_client.get_webhook_info()
             if webhook_info.url == webhook_url:
@@ -44,7 +44,7 @@ class Bot:
                     else:
                         logger.error(f"Error setting webhook: {e}")
                         break
-                time.sleep(2 ** attempt)  # Exponential backoff
+                time.sleep(2 ** attempt)
         except Exception as e:
             logger.error(f"Error setting up webhook: {e}")
 
@@ -98,7 +98,6 @@ class ObjectDetectionBot(Bot):
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
         self.sqs_client = boto3.client('sqs', region_name=self.aws_region)
         self.pending_prediction = {}
-        self.images_queue = {}
         logger.info("ObjectDetectionBot initialized.")
 
     def upload_to_s3(self, file_path):
@@ -128,7 +127,7 @@ class ObjectDetectionBot(Bot):
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
                 if attempts < retry_attempts - 1:
-                    time.sleep(2 ** attempts)  # Exponential backoff
+                    time.sleep(2 ** attempts)
                 else:
                     raise
 
@@ -145,7 +144,7 @@ class ObjectDetectionBot(Bot):
             except Exception as e:
                 if attempt < retry_attempts - 1:
                     logger.error(f"Error sending message to SQS, retrying... (Attempt {attempt + 1}/{retry_attempts})")
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)
                 else:
                     logger.error(f"Error sending message to SQS: {e}")
                     raise
@@ -173,20 +172,14 @@ class ObjectDetectionBot(Bot):
         logger.info(f'Received text message: {text}')
         if text.startswith('/predict'):
             self.pending_prediction[chat_id] = True
-            self.images_queue[chat_id] = []
             self.send_text(chat_id, 'Please send the photos you want to analyze.')
             logger.info(f'Set pending_prediction for chat_id {chat_id} to True')
-        elif text.startswith('/done'):
-            if self.pending_prediction.get(chat_id, False):
-                self.process_images(chat_id)
-            else:
-                self.send_text(chat_id, 'No prediction is pending. Please use the /predict command first.')
         else:
-            self.send_text(chat_id, 'Unsupported command. Please use the /predict command followed by the /done command when finished.')
+            self.send_text(chat_id, 'Unsupported command. Please use the /predict command.')
 
     def handle_photo_message(self, chat_id, msg):
         logger.info(f'Received photo message for chat_id {chat_id}')
-        if not self.pending_prediction.get(chat_id, True):
+        if not self.pending_prediction.get(chat_id, False):
             self.send_text(chat_id, 'Please use the /predict command before sending photos.')
             logger.info(f'Ignored photo message for chat_id {chat_id} as no prediction is pending.')
             return
@@ -195,11 +188,17 @@ class ObjectDetectionBot(Bot):
             photo_path = self.download_user_photo(msg)
             logger.info(f'Photo downloaded to: {photo_path}')
 
-            # Ensure photos are not processed prematurely
-            if chat_id not in self.images_queue:
-                self.images_queue[chat_id] = []
+            # Process image immediately after receiving it
+            s3_object = self.upload_to_s3(photo_path)
+            logger.info(f'Image uploaded to S3: {s3_object}')
 
-            self.images_queue[chat_id].append(photo_path)
+            message = json.dumps({
+                'chat_id': chat_id,
+                'image_path': s3_object
+            })
+            self.send_message_to_sqs(message)
+            self.send_text(chat_id, "Image has been uploaded and is being processed.")
+            logger.info(f"Image processed for chat_id {chat_id}")
 
         except (RuntimeError, TimeoutError) as e:
             logger.error(f"Error occurred: {e}")
@@ -207,27 +206,3 @@ class ObjectDetectionBot(Bot):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             self.send_text(chat_id, f"An unexpected error occurred: {e}")
-
-    def process_images(self, chat_id):
-        logger.info(f'Processing images for chat_id {chat_id}')
-        # Process all images in the queue
-        if chat_id in self.images_queue and self.images_queue[chat_id]:
-            for photo_path in self.images_queue[chat_id]:
-                try:
-                    s3_object = self.upload_to_s3(photo_path)
-                    logger.info(f'Image uploaded to S3: {s3_object}')
-
-                    message = json.dumps({
-                        'chat_id': chat_id,
-                        'image_path': s3_object
-                    })
-                    self.send_message_to_sqs(message)
-
-                except Exception as e:
-                    logger.error(f"Error processing image: {e}")
-                    self.send_text(chat_id, f"Error processing image: {e}")
-            self.send_text(chat_id, "Images are being processed.")
-            self.pending_prediction[chat_id] = False
-            self.images_queue[chat_id] = []
-        else:
-            self.send_text(chat_id, 'No images to process.')
