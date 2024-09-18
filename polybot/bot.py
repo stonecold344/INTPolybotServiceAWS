@@ -194,7 +194,7 @@ class ObjectDetectionBot(Bot):
 
             message = json.dumps({
                 'chat_id': chat_id,
-                'image_path': s3_object
+                'image_url': s3_object
             })
             self.send_message_to_sqs(message)
             self.send_text(chat_id, "Image has been uploaded and is being processed.")
