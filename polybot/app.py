@@ -19,7 +19,6 @@ app = flask.Flask(__name__)
 
 def get_secret(secret_id):
     session = boto3.session.Session()
-    logging.info(session.get_credentials())
     client = session.client(service_name='secretsmanager', region_name='eu-west-3')
 
     try:
@@ -30,21 +29,22 @@ def get_secret(secret_id):
         logging.error(f"Error retrieving secret: {e}")
         raise e
 
-yolo5_instance_ip = {}
-ec2 = boto3.client('ec2', region_name='eu-west-3')
-response = ec2.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']}, {'Name': 'instance-state-name', 'Values': ['running']}])
-for reservation in response['Reservations']:
-    for instance in reservation['Instances']:
-        yolo5_instance_ip = instance.get('PublicIpAddress')
-        print(instance.get('PublicIpAddress'))
-
-if yolo5_instance_ip:
-    YOLO5_URL = f'http://{yolo5_instance_ip}:8081'
-    logging.info(f"YOLO5 service URL: {YOLO5_URL}")
-else:
-    YOLO5_URL=None
+def get_yolo5_url():
+    ec2 = boto3.client('ec2', region_name='eu-west-3')
+    response = ec2.describe_instances(Filters=[
+        {'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']},
+        {'Name': 'instance-state-name', 'Values': ['running']}
+    ])
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            yolo5_instance_ip = instance.get('PublicIpAddress')
+            if yolo5_instance_ip:
+                return f'http://{yolo5_instance_ip}:8081'
     logging.error("Could not find YOLO5 instance IP")
+    return None
 
+YOLO5_URL = get_yolo5_url()
+logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
@@ -63,6 +63,7 @@ SQS_URL = os.getenv('SQS_URL')
 logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
              f"S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
              f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
@@ -79,8 +80,8 @@ def set_webhook():
     try:
         # Get current webhook info
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
-        responses = requests.get(url)
-        webhook_info = responses.json()
+        response = requests.get(url)
+        webhook_info = response.json()
         logging.info("Webhook info: %s", webhook_info)
 
         # Check if webhook is already set to the correct URL
@@ -95,8 +96,8 @@ def set_webhook():
 
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
-        responses = requests.post(set_url, data={"url": desired_url})
-        result = responses.json()
+        response = requests.post(set_url, data={"url": desired_url})
+        result = response.json()
         logging.info("Set webhook response: %s", result)
 
         if result.get('ok'):
@@ -129,11 +130,11 @@ def results():
         return jsonify({'error': 'predictionId is required'}), 400
 
     try:
-        responses = table.get_item(Key={'prediction_id': prediction_id})
-        if 'Item' not in responses:
+        response = table.get_item(Key={'prediction_id': prediction_id})
+        if 'Item' not in response:
             logging.error(f"Prediction not found for ID: {prediction_id}")
             return jsonify({'error': 'Prediction not found'}), 404
-        prediction_summary = responses['Item']
+        prediction_summary = response['Item']
         chat_id = prediction_summary['chat_id']
         labels = prediction_summary['labels']
         text_results = '\n'.join([f"{label['class']} : {label['count']}" for label in labels])
@@ -162,12 +163,12 @@ def predict():
             'image_url': image_url,
             'chat_id': req.get('chat_id')
         })
-        responses = boto3.client('sqs', region_name=AWS_REGION).send_message(
+        response = boto3.client('sqs', region_name=AWS_REGION).send_message(
             QueueUrl=SQS_URL,
             MessageBody=message_body
         )
 
-        logging.info(f"Message sent to SQS with ID: {responses.get('MessageId')}")
+        logging.info(f"Message sent to SQS with ID: {response.get('MessageId')}")
         return jsonify({'message': 'Prediction job queued successfully'}), 200
 
     except Exception as e:

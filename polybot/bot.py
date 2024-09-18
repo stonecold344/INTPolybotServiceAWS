@@ -5,9 +5,7 @@ import time
 from telebot.types import InputFile
 import json
 import uuid
-import requests
 import boto3
-
 
 class Bot:
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
@@ -21,7 +19,9 @@ class Bot:
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
 
     def setup_webhook(self, token):
-        webhook_url = f'{self.telegram_chat_url}/{token}/'  # Make sure HTTPS is used for production
+        webhook_url = f'{self.telegram_chat_url}/{token}/'  # Ensure HTTPS is used for production
+        logger.info(f"Setting webhook URL: {webhook_url}")
+
         try:
             webhook_info = self.telegram_bot_client.get_webhook_info()
             if webhook_info.url == webhook_url:
@@ -90,7 +90,6 @@ class Bot:
             logger.info(f'Sent photo to chat_id {chat_id}')
         except Exception as e:
             logger.error(f"Error sending photo: {e}")
-
 
 class ObjectDetectionBot(Bot):
     def __init__(self, token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url):
@@ -187,7 +186,7 @@ class ObjectDetectionBot(Bot):
     def handle_photo_message(self, chat_id, msg):
         logger.info(f'Received photo message for chat_id {chat_id}')
         if not self.pending_prediction.get(chat_id, False):
-            self.send_text(chat_id, 'Please use the /predict command before sending photos.')
+            self.send_text(chat_id, 'You need to start a prediction session using the /predict command before sending photos.')
             logger.info(f'Ignored photo message for chat_id {chat_id} as no prediction is pending.')
             return
 
@@ -195,7 +194,6 @@ class ObjectDetectionBot(Bot):
             photo_path = self.download_user_photo(msg)
             logger.info(f'Photo downloaded to: {photo_path}')
 
-            # Ensure photos are not processed prematurely
             if chat_id not in self.images_queue:
                 self.images_queue[chat_id] = []
 
@@ -203,31 +201,34 @@ class ObjectDetectionBot(Bot):
 
         except (RuntimeError, TimeoutError) as e:
             logger.error(f"Error occurred: {e}")
-            self.send_text(chat_id, f"An error occurred: {e}")
+            self.send_text(chat_id, f"An error occurred while processing your photo: {e}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             self.send_text(chat_id, f"An unexpected error occurred: {e}")
 
     def process_images(self, chat_id):
         logger.info(f'Processing images for chat_id {chat_id}')
-        # Process all images in the queue
         if chat_id in self.images_queue and self.images_queue[chat_id]:
             for photo_path in self.images_queue[chat_id]:
                 try:
                     s3_object = self.upload_to_s3(photo_path)
                     logger.info(f'Image uploaded to S3: {s3_object}')
 
-                    message = json.dumps({
-                        'chat_id': chat_id,
-                        'image_path': s3_object
+                    message_body = json.dumps({
+                        's3_object': s3_object,
+                        'chat_id': chat_id
                     })
-                    self.send_message_to_sqs(message)
 
+                    self.send_message_to_sqs(message_body)
+
+                    self.send_text(chat_id, 'Your photos are being processed.')
+                    logger.info(f'Sent processing message for chat_id {chat_id}')
                 except Exception as e:
-                    logger.error(f"Error processing image: {e}")
-                    self.send_text(chat_id, f"Error processing image: {e}")
-            self.send_text(chat_id, "Images are being processed.")
-            self.pending_prediction[chat_id] = False
-            self.images_queue[chat_id] = []
+                    logger.error(f"Error processing image {photo_path}: {e}")
+                    self.send_text(chat_id, f"An error occurred while processing your images: {e}")
+
+            del self.images_queue[chat_id]
+            del self.pending_prediction[chat_id]
         else:
-            self.send_text(chat_id, 'No images to process.')
+            self.send_text(chat_id, 'No photos to process.')
+            logger.info(f'No photos to process for chat_id {chat_id}')
