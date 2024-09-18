@@ -5,7 +5,6 @@ import time
 from telebot.types import InputFile
 import json
 import uuid
-import requests
 import boto3
 
 
@@ -106,11 +105,12 @@ class ObjectDetectionBot(Bot):
         object_name = f'docker-project/photos_{unique_id}_{file_name}'
 
         retry_attempts = 3
-        for attempts in range(retry_attempts):
+        for attempt in range(retry_attempts):
             try:
                 logger.info(f'Uploading file to S3: {file_path}')
                 self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
 
+                # Wait for the file to be available on S3
                 max_attempts = 10
                 for attempt in range(max_attempts):
                     response = self.s3_client.list_objects_v2(Bucket=self.s3_bucket_name, Prefix=object_name)
@@ -126,12 +126,16 @@ class ObjectDetectionBot(Bot):
 
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
-                if attempts < retry_attempts - 1:
-                    time.sleep(2 ** attempts)
+                if attempt < retry_attempts - 1:
+                    time.sleep(2 ** attempt)
                 else:
                     raise
 
     def send_message_to_sqs(self, message_body):
+        # Ensure message_body is a JSON string
+        if isinstance(message_body, dict):
+            message_body = json.dumps(message_body)
+
         retry_attempts = 5
         for attempt in range(retry_attempts):
             try:
@@ -192,10 +196,10 @@ class ObjectDetectionBot(Bot):
             s3_object = self.upload_to_s3(photo_path)
             logger.info(f'Image uploaded to S3: {s3_object}')
 
-            message = json.dumps({
+            message = {
                 'chat_id': chat_id,
                 'image_path': s3_object
-            })
+            }
             self.send_message_to_sqs(message)
             self.send_text(chat_id, "Image has been uploaded and is being processed.")
             logger.info(f"Image processed for chat_id {chat_id}")
