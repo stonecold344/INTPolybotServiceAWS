@@ -175,28 +175,28 @@ class ObjectDetectionBot(Bot):
             self.send_text(chat_id, 'Please use the /predict command before sending photos.')
             logger.info(f'Ignored photo message for chat_id {chat_id} as no prediction is pending.')
             return
+        else:
+            try:
+                for photo in msg['photo']:
+                    photo_path = self.download_user_photo(photo['file_id'])
+                    logger.info(f'Photo downloaded to: {photo_path}')
 
-        try:
-            for photo in msg['photo']:
-                photo_path = self.download_user_photo(photo['file_id'])
-                logger.info(f'Photo downloaded to: {photo_path}')
+                    s3_object = self.upload_to_s3(photo_path)
+                    logger.info(f'Image uploaded to S3: {s3_object}')
 
-                s3_object = self.upload_to_s3(photo_path)
-                logger.info(f'Image uploaded to S3: {s3_object}')
+                    message = json.dumps({
+                        'chat_id': chat_id,
+                        'image_url': s3_object
+                    })
+                    self.send_message_to_sqs(message)
+                    logger.info(f"Image processed for chat_id {chat_id}")
 
-                message = json.dumps({
-                    'chat_id': chat_id,
-                    'image_url': s3_object
-                })
-                self.send_message_to_sqs(message)
-                logger.info(f"Image processed for chat_id {chat_id}")
+                self.pending_prediction[chat_id] = False
+                logger.info(f'Reset pending_prediction for chat_id {chat_id}')
 
-            self.pending_prediction[chat_id] = False
-            logger.info(f'Reset pending_prediction for chat_id {chat_id}')
-
-        except (RuntimeError, TimeoutError) as e:
-            logger.error(f"Error occurred: {e}")
-            self.send_text(chat_id, f"An error occurred: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.send_text(chat_id, f"An unexpected error occurred: {e}")
+            except (RuntimeError, TimeoutError) as e:
+                logger.error(f"Error occurred: {e}")
+                self.send_text(chat_id, f"An error occurred: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                self.send_text(chat_id, f"An unexpected error occurred: {e}")
