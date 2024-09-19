@@ -19,6 +19,35 @@ class Bot:
         self.setup_webhook(token)
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
 
+        dynamodb = boto3.resource('dynamodb', region_name=aws_region)
+        self.table = dynamodb.Table('ChatPredictionState-bennyi')  # Set table as instance attribute
+
+    # Function to get the pending prediction status for a chat
+    def get_pending_status(self, chat_id):
+        try:
+            response = self.table.get_item(Key={'chat_id': chat_id})
+            if 'Item' in response:
+                return response['Item'].get('pending_prediction', False)
+            else:
+                return False
+        except ClientError as e:
+            logger.error(f"Error retrieving data: {e.response['Error']['Message']}")
+            return False
+
+    # Function to set pending prediction status
+    def set_pending_status(self, chat_id, status):
+        try:
+            self.table.put_item(
+                Item={
+                    'chat_id': chat_id,
+                    'pending_prediction': status,
+                    'timestamp': int(time.time())  # Add a timestamp for reference
+                }
+            )
+            logger.info(f"Set pending status for chat_id {chat_id} to {status}")
+        except ClientError as e:
+            logger.error(f"Error setting data: {e.response['Error']['Message']}")
+
     def setup_webhook(self, token):
         webhook_url = f'{self.telegram_chat_url}/{token}/'
         try:
@@ -91,7 +120,6 @@ class ObjectDetectionBot(Bot):
         super().__init__(token, telegram_chat_url, s3_bucket_name, yolo5_url, aws_region, sqs_url)
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
         self.sqs_client = boto3.client('sqs', region_name=self.aws_region)
-        self.pending_prediction = {}
         logger.info("ObjectDetectionBot initialized.")
 
     def upload_to_s3(self, file_path):
@@ -150,7 +178,8 @@ class ObjectDetectionBot(Bot):
             return
 
         chat_id = msg['chat']['id']
-        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {self.pending_prediction.get(chat_id, False)}')
+        pending_status = self.get_pending_status(chat_id)  # Get status from DynamoDB
+        logger.info(f'Current pending_prediction state for chat_id {chat_id}: {pending_status}')
 
         if 'text' in msg:
             self.handle_text_message(chat_id, msg['text'])
@@ -163,40 +192,32 @@ class ObjectDetectionBot(Bot):
     def handle_text_message(self, chat_id, text):
         logger.info(f'Received text message: {text}')
         if text.startswith('/predict'):
-            self.pending_prediction[chat_id] = True
+            self.set_pending_status(chat_id, True)  # Set status in DynamoDB
             self.send_text(chat_id, 'Please send the photos you want to analyze.')
-            logger.info(f'Set pending_prediction for chat_id {chat_id} to True')
         else:
             self.send_text(chat_id, 'Unsupported command. Please use the /predict command.')
 
     def handle_photo_message(self, chat_id, msg):
         logger.info(f'Received photo message for chat_id {chat_id}')
-        if not self.pending_prediction.get(chat_id, False):
-            self.send_text(chat_id, 'Please use the /predict command before sending photos.')
-            logger.info(f'Ignored photo message for chat_id {chat_id} as no prediction is pending.')
+
+        # Check pending prediction state in DynamoDB
+        if not self.get_pending_status(chat_id):
+            self.send_text(chat_id, "Unexpected photo. Please use the /predict command first.")
             return
-        else:
-            try:
-                for photo in msg['photo']:
-                    photo_path = self.download_user_photo(photo['file_id'])
-                    logger.info(f'Photo downloaded to: {photo_path}')
 
-                    s3_object = self.upload_to_s3(photo_path)
-                    logger.info(f'Image uploaded to S3: {s3_object}')
+        # Download the photo
+        photos = msg['photo']
+        photo_id = photos[-1]['file_id']
+        file_path = self.download_user_photo(photo_id)
 
-                    message = json.dumps({
-                        'chat_id': chat_id,
-                        'image_url': s3_object
-                    })
-                    self.send_message_to_sqs(message)
-                    logger.info(f"Image processed for chat_id {chat_id}")
+        # Upload the photo to S3 and send a job to the SQS queue
+        s3_object_name = self.upload_to_s3(file_path)
+        message_body = json.dumps({
+            'chat_id': chat_id,
+            'photo_id': photo_id,
+            'file_path': s3_object_name
+        })
+        self.send_message_to_sqs(message_body)
+        self.set_pending_status(chat_id, False)  # Reset status in DynamoDB
 
-                self.pending_prediction[chat_id] = False
-                logger.info(f'Reset pending_prediction for chat_id {chat_id}')
-
-            except (RuntimeError, TimeoutError) as e:
-                logger.error(f"Error occurred: {e}")
-                self.send_text(chat_id, f"An error occurred: {e}")
-            except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-                self.send_text(chat_id, f"An unexpected error occurred: {e}")
+        self.send_text(chat_id, "Photo received! Processing will start shortly.")
