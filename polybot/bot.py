@@ -19,6 +19,7 @@ class Bot:
         self.setup_webhook(token)
         logger.info(f'Telegram Bot information:\n{self.telegram_bot_client.get_me()}')
 
+        # Setup DynamoDB
         dynamodb = boto3.resource('dynamodb', region_name=aws_region)
         self.table = dynamodb.Table('ChatPredictionState-bennyi')  # Set table as instance attribute
 
@@ -26,12 +27,12 @@ class Bot:
     def get_pending_status(self, chat_id):
         try:
             response = self.table.get_item(Key={'chat_id': chat_id})
-            if 'Item' in response:
-                return response['Item'].get('pending_prediction', False)
+            if 'Item' in response and 'pending_prediction' in response['Item']:
+                return response['Item']['pending_prediction']
             else:
                 return False
-        except ClientError as e:
-            logger.error(f"Error retrieving data: {e.response['Error']['Message']}")
+        except Exception as e:
+            logger.error(f"Error retrieving data: {e}")
             return False
 
     # Function to set pending prediction status
