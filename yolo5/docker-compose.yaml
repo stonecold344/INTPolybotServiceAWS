@@ -11,7 +11,6 @@ services:
       DYNAMODB_TABLE: ${DYNAMODB_TABLE}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       SQS_URL: ${SQS_URL}
-      TELEGRAM_APP_URL: ${TELEGRAM_APP_URL}
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always
