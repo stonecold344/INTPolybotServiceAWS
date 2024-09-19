@@ -216,7 +216,7 @@ class ObjectDetectionBot(Bot):
         message_body = json.dumps({
             'chat_id': chat_id,
             'photo_id': photo_id,
-            'file_path': s3_object_name
+            'image_url': s3_object_name
         })
         self.send_message_to_sqs(message_body)
         self.set_pending_status(chat_id, False)  # Reset status in DynamoDB

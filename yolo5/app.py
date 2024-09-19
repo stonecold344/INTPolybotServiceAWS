@@ -159,7 +159,7 @@ def notify_telegram(chat_id, message):
 def consume():
     while True:
         try:
-            response = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=5)
+            response = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20)
 
             if 'Messages' in response:
                 message = json.loads(response['Messages'][0]['Body'])
