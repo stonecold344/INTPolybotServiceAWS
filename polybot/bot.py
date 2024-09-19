@@ -21,7 +21,7 @@ class Bot:
 
         # Setup DynamoDB
         dynamodb = boto3.resource('dynamodb', region_name=aws_region)
-        self.table = dynamodb.Table('ChatPredictionStatep-bennyi')  # Set table as instance attribute
+        self.table = dynamodb.Table('ChatPredictionState-bennyi')  # Set table as instance attribute
 
     # Function to get the pending prediction status for a chat
     def get_pending_status(self, chat_id):
