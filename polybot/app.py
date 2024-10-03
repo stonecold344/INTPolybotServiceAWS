@@ -17,9 +17,16 @@ logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
 
+# Environment Variables
+TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
+AWS_REGION = os.getenv('AWS_REGION')  # Load region dynamically
+SQS_URL = os.getenv('SQS_URL')
+
 def get_secret(secret_id):
     session = boto3.session.Session()
-    client = session.client(service_name='secretsmanager', region_name='eu-west-3')
+    client = session.client(service_name='secretsmanager', region_name=AWS_REGION)  # Use dynamic region
 
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_id)
@@ -30,7 +37,7 @@ def get_secret(secret_id):
         raise e
 
 def get_yolo5_url():
-    ec2 = boto3.client('ec2', region_name='eu-west-3')
+    ec2 = boto3.client('ec2', region_name=AWS_REGION)  # Use dynamic region
     response = ec2.describe_instances(Filters=[
         {'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']},
         {'Name': 'instance-state-name', 'Values': ['running']}
@@ -43,9 +50,6 @@ def get_yolo5_url():
     logging.error("Could not find YOLO5 instance IP")
     return None
 
-YOLO5_URL = get_yolo5_url()
-logging.info(f"YOLO5 service URL: {YOLO5_URL}")
-
 # Retrieve the Telegram token
 SECRET_ID = "telegram/token"
 secrets = get_secret(SECRET_ID)
@@ -54,26 +58,23 @@ TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
 # Use the token in your application
 logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 
-# Environment Variables
-TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
-AWS_REGION = os.getenv('AWS_REGION')
-SQS_URL = os.getenv('SQS_URL')
+# Log environment variables for debugging
 logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
-             f"S3_BUCKET_NAME={S3_BUCKET_NAME}, YOLO5_URL={YOLO5_URL}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
+             f"S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
              f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
 
 # Ensure all environment variables are loaded
-if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
+if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
     logging.error("One or more environment variables are missing")
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)
+dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)  # Use dynamic region
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
+YOLO5_URL = get_yolo5_url()
+logging.info(f"YOLO5 service URL: {YOLO5_URL}")
 bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
 
 def set_webhook():

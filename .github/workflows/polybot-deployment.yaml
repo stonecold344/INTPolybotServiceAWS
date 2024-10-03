@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IPS: 13.38.24.70,13.38.26.168  # Add more IPs as needed
+  EC2_PUBLIC_IPS: 54.147.149.54
 
 jobs:
   Build:
@@ -64,10 +64,10 @@ jobs:
               echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
               echo "S3_BUCKET_NAME=bennyi-aws-s3-bucket" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
               echo "TELEGRAM_APP_URL=aws-domain-bennyi.int-devops.click:8443" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-              echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:${{ github.run_number }}" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-              echo "DYNAMODB_TABLE=AWS-Project-Predictions-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-              echo "AWS_REGION=eu-west-3" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
-              echo "SQS_URL=https://sqs.eu-west-3.amazonaws.com/019273956931/aws-sqs-image-processing-bennyi" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+              echo "POLYBOT_IMG_NAME=${{ secrets.DOCKER_USERNAME }}/polybot:1" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+              echo "DYNAMODB_TABLE=PolybotData" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+              echo "AWS_REGION=us-east-1" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
+              echo "SQS_URL=https://sqs.us-east-1.amazonaws.com/019273956931/polybot-queue" >> /home/ubuntu/projects/AWSProject-bennyi/polybot/.env
 
               # Install Docker and Docker Compose if needed
               if ! command -v docker &> /dev/null
