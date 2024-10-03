@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  EC2_PUBLIC_IPS: 54.147.149.54
+  EC2_PUBLIC_IPS: 3.89.63.103
 
 jobs:
   Build:
