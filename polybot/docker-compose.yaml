@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   polybot:
     image: ${POLYBOT_IMG_NAME}

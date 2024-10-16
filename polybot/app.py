@@ -12,7 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables from the .env file
-load_dotenv(dotenv_path='/usr/src/app/.env')  # Update path if needed
+load_dotenv(dotenv_path='/usr/src/app/.env')
 logging.info("Env file loaded")
 
 app = flask.Flask(__name__)
@@ -21,13 +21,14 @@ app = flask.Flask(__name__)
 TELEGRAM_APP_URL = os.getenv('TELEGRAM_APP_URL')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
-AWS_REGION = os.getenv('AWS_REGION')  # Load region dynamically
+AWS_REGION = os.getenv('AWS_REGION')
 SQS_URL = os.getenv('SQS_URL')
 
-def get_secret(secret_id):
-    session = boto3.session.Session()
-    client = session.client(service_name='secretsmanager', region_name=AWS_REGION)  # Use dynamic region
+# Initialize boto3 session globally
+boto_session = boto3.session.Session(region_name=AWS_REGION)
 
+def get_secret(secret_id):
+    client = boto_session.client(service_name='secretsmanager')
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_id)
         secret = get_secret_value_response['SecretString']
@@ -37,31 +38,26 @@ def get_secret(secret_id):
         raise e
 
 def get_yolo5_url():
-    ec2 = boto3.client('ec2', region_name=AWS_REGION)  # Use dynamic region
-    response = ec2.describe_instances(Filters=[
-        {'Name': 'tag:Name', 'Values': ['aws-yolo5-bennyi']},
-        {'Name': 'instance-state-name', 'Values': ['running']}
-    ])
-    for reservation in response['Reservations']:
-        for instance in reservation['Instances']:
-            yolo5_instance_ip = instance.get('PublicIpAddress')
-            if yolo5_instance_ip:
-                return f'http://{yolo5_instance_ip}:8081'
+    ec2 = boto_session.client('ec2')
+    try:
+        response = ec2.describe_instances(Filters=[
+            {'Name': 'tag:Name', 'Values': ['yolo5-instance-bennyi']},
+            {'Name': 'instance-state-name', 'Values': ['running']}
+        ])
+        for reservation in response['Reservations']:
+            for instance in reservation['Instances']:
+                yolo5_instance_ip = instance.get('PublicIpAddress')
+                if yolo5_instance_ip:
+                    return f'http://{yolo5_instance_ip}:8081'
+    except Exception as e:
+        logging.error(f"Error fetching YOLO5 instance IP: {e}")
     logging.error("Could not find YOLO5 instance IP")
     return None
 
 # Retrieve the Telegram token
-SECRET_ID = "telegram/token"
+SECRET_ID = "Telegram-Secret-Bennyi23"
 secrets = get_secret(SECRET_ID)
-TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
-
-# Use the token in your application
-logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
-
-# Log environment variables for debugging
-logging.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN}, TELEGRAM_APP_URL={TELEGRAM_APP_URL}, "
-             f"S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
-             f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+TELEGRAM_TOKEN = secrets.get("Telegram-Secret-Bennyi")
 
 # Ensure all environment variables are loaded
 if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, DYNAMODB_TABLE, AWS_REGION, SQS_URL]):
@@ -69,13 +65,13 @@ if not all([TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, DYNAMODB_TABLE, AW
     raise ValueError("One or more environment variables are missing")
 
 # Initialize DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)  # Use dynamic region
+dynamodb = boto_session.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
 # Define bot object globally
 YOLO5_URL = get_yolo5_url()
 logging.info(f"YOLO5 service URL: {YOLO5_URL}")
-bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL)
+bot = ObjectDetectionBot(TELEGRAM_TOKEN, TELEGRAM_APP_URL, S3_BUCKET_NAME, YOLO5_URL, AWS_REGION, SQS_URL, DYNAMODB_TABLE)
 
 def set_webhook():
     try:
@@ -83,7 +79,6 @@ def set_webhook():
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
         response = requests.get(url)
         webhook_info = response.json()
-        logging.info("Webhook info: %s", webhook_info)
 
         # Check if webhook is already set to the correct URL
         current_url = webhook_info['result'].get('url', None)
@@ -92,15 +87,11 @@ def set_webhook():
         if current_url == desired_url:
             logging.info("Webhook is already set to the desired URL: %s", current_url)
             return
-        else:
-            logging.info("Setting webhook as it is not set or has a different URL. Current webhook URL: %s", current_url)
 
         # Set webhook if not already set or has a different URL
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
         response = requests.post(set_url, data={"url": desired_url})
         result = response.json()
-        logging.info("Set webhook response: %s", result)
-
         if result.get('ok'):
             logging.info("Webhook set successfully")
         else:
@@ -118,7 +109,6 @@ def webhook():
     req = request.get_json()
     logging.info("Received request: %s", req)
     if req is None:
-        logging.warning("Received empty request payload")
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
@@ -127,13 +117,10 @@ def webhook():
 def results():
     prediction_id = request.args.get('predictionId')
     if not prediction_id:
-        logging.error("Missing predictionId")
         return jsonify({'error': 'predictionId is required'}), 400
-
     try:
         response = table.get_item(Key={'prediction_id': prediction_id})
         if 'Item' not in response:
-            logging.error(f"Prediction not found for ID: {prediction_id}")
             return jsonify({'error': 'Prediction not found'}), 404
         prediction_summary = response['Item']
         chat_id = prediction_summary['chat_id']
@@ -150,28 +137,23 @@ def predict():
     try:
         req = request.get_json()
         if req is None:
-            logging.warning("Received empty request payload")
             return jsonify({'error': 'Empty request payload'}), 400
 
-        # Extract necessary fields from request
         image_url = req.get('image_url')
         if not image_url:
-            logging.error("Missing image_url")
             return jsonify({'error': 'image_url is required'}), 400
 
-        # Send a message to SQS with the necessary information
         message_body = json.dumps({
             'image_url': image_url,
             'chat_id': req.get('chat_id')
         })
-        response = boto3.client('sqs', region_name=AWS_REGION).send_message(
+        response = boto_session.client('sqs').send_message(
             QueueUrl=SQS_URL,
             MessageBody=message_body
         )
 
         logging.info(f"Message sent to SQS with ID: {response.get('MessageId')}")
         return jsonify({'message': 'Prediction job queued successfully'}), 200
-
     except Exception as e:
         logging.error(f"Error in /predict endpoint: {e}")
         return jsonify({'error': str(e)}), 500
@@ -180,11 +162,10 @@ def predict():
 def load_test():
     req = request.get_json()
     if req is None:
-        logging.warning("Received empty request payload")
         return jsonify({'error': 'Empty request payload'}), 400
     bot.handle_message(req.get('message', {}))
     return 'Ok'
 
 if __name__ == '__main__':
-    set_webhook()  # Set the webhook when the app starts
+    set_webhook()
     app.run(host='0.0.0.0', port=8443, debug=True)

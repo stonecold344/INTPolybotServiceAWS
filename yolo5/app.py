@@ -33,9 +33,9 @@ def get_secret(secret_id):
         raise e
 
 # Retrieve the Telegram token
-SECRET_ID = "telegram/token"
+SECRET_ID = "Telegram-Secret-Bennyi23"
 secrets = get_secret(SECRET_ID)
-TELEGRAM_TOKEN = secrets.get("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = secrets.get("Telegram-Secret-Bennyi")
 
 
 # Initialize S3, SQS, and DynamoDB clients
@@ -44,9 +44,11 @@ AWS_REGION = os.getenv('AWS_REGION')
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
-logger.info(f"Env variables: TELEGRAM_TOKEN={TELEGRAM_TOKEN} "
-             f"S3_BUCKET_NAME={S3_BUCKET_NAME}, DYNAMODB_TABLE={DYNAMODB_TABLE}, "
-             f"AWS_REGION={AWS_REGION}, SQS_URL={SQS_URL}")
+logger.info(f'Telegram Bot information:\n{TELEGRAM_TOKEN}')
+logger.info(f"S3 Bucket Name: {S3_BUCKET_NAME}")
+logger.info(f"AWS Region: {AWS_REGION}")
+logger.info(f"SQS URL: {SQS_URL}")
+logger.info(f"DynamoDB Table: {DYNAMODB_TABLE}")
 
 # Ensure all environment variables are loaded
 if not all([SQS_URL, AWS_REGION, TELEGRAM_TOKEN, DYNAMODB_TABLE, S3_BUCKET_NAME]):
@@ -54,6 +56,10 @@ if not all([SQS_URL, AWS_REGION, TELEGRAM_TOKEN, DYNAMODB_TABLE, S3_BUCKET_NAME]
     raise ValueError("One or more environment variables are missing")
 
 sqs_client = boto3.client('sqs', region_name=AWS_REGION)
+queue_name = 'aws-sqs-image-processing-bennyi'
+response = sqs_client.get_queue_url(QueueName=queue_name)
+SQS_QUEUE_NAME = response['QueueUrl']
+print(f"SQS_QUEUE_URL: {SQS_QUEUE_NAME}")
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb_client.Table(DYNAMODB_TABLE)
@@ -149,7 +155,7 @@ def notify_telegram(chat_id, message):
     payload = {'chat_id': chat_id, 'text': message}
 
     try:
-        response = requests.post(telegram_api_url, data=payload)
+        responses = requests.post(telegram_api_url, data=payload)
         response.raise_for_status()
         logger.info(f"Sent message to Telegram chat {chat_id}: {message}")
     except requests.exceptions.RequestException as e:
@@ -159,7 +165,10 @@ def notify_telegram(chat_id, message):
 def consume():
     while True:
         try:
-            response = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20)
+            logger.info("Attempting to receive messages from SQS...")
+
+            responses = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20)
+            logger.info(f"SQS response received: {response}")
 
             if 'Messages' in response:
                 message = json.loads(response['Messages'][0]['Body'])
