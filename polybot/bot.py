@@ -69,7 +69,7 @@ class Bot:
                 return
 
             self.telegram_bot_client.remove_webhook()
-            for attempt in range(5):
+            for attempt in range(1):
                 try:
                     self.telegram_bot_client.set_webhook(url=webhook_url, timeout=60)
                     logger.info("Webhook successfully set.")
@@ -147,7 +147,7 @@ class ObjectDetectionBot(Bot):
         unique_id = uuid.uuid4()
         object_name = f'docker-project/photos_{unique_id}_{file_name}'
 
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 self.s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
                 # Poll S3 to check if object is available
@@ -162,7 +162,7 @@ class ObjectDetectionBot(Bot):
                 raise
             except Exception as e:
                 logger.error(f"Error uploading to S3: {e}")
-                if attempt < 2:
+                if attempt < 1:
                     time.sleep(2 ** attempt)
                 else:
                     raise
@@ -180,7 +180,7 @@ class ObjectDetectionBot(Bot):
                 raise
             except Exception as e:
                 logger.error(f"Error sending message to SQS: {e}")
-                if attempt < 4:
+                if attempt < 1:
                     time.sleep(2 ** attempt)
                 else:
                     raise

@@ -18,12 +18,15 @@ from detect import run
 # Load environment variables
 load_dotenv(dotenv_path='/usr/src/app/.env')
 logger.info("Environment file loaded")
+# Initialize S3, SQS, and DynamoDB clients
+SQS_URL = os.getenv('SQS_URL')
+AWS_REGION = os.getenv('AWS_REGION')
+DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+boto_session = boto3.session.Session(region_name=AWS_REGION)
 
 def get_secret(secret_id):
-    session = boto3.session.Session()
-    logging.info(session.get_credentials())
-    client = session.client(service_name='secretsmanager', region_name='eu-west-3')
-
+    client = boto_session.client(service_name='secretsmanager')
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_id)
         secret = get_secret_value_response['SecretString']
@@ -33,16 +36,11 @@ def get_secret(secret_id):
         raise e
 
 # Retrieve the Telegram token
-SECRET_ID = "Telegram-Secret-Bennyi23"
+SECRET_ID = "Telegram-Secret-Bennyi24"
 secrets = get_secret(SECRET_ID)
 TELEGRAM_TOKEN = secrets.get("Telegram-Secret-Bennyi")
 
 
-# Initialize S3, SQS, and DynamoDB clients
-SQS_URL = os.getenv('SQS_URL')
-AWS_REGION = os.getenv('AWS_REGION')
-DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE')
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 logger.info(f'Telegram Bot information:\n{TELEGRAM_TOKEN}')
 logger.info(f"S3 Bucket Name: {S3_BUCKET_NAME}")
@@ -59,7 +57,8 @@ sqs_client = boto3.client('sqs', region_name=AWS_REGION)
 queue_name = 'aws-sqs-image-processing-bennyi'
 response = sqs_client.get_queue_url(QueueName=queue_name)
 SQS_QUEUE_NAME = response['QueueUrl']
-print(f"SQS_QUEUE_URL: {SQS_QUEUE_NAME}")
+logger.info(f"SQS_QUEUE_URL: {SQS_QUEUE_NAME}")
+
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 dynamodb_client = boto3.resource('dynamodb', region_name=AWS_REGION)
 table = dynamodb_client.Table(DYNAMODB_TABLE)
@@ -156,7 +155,7 @@ def notify_telegram(chat_id, message):
 
     try:
         responses = requests.post(telegram_api_url, data=payload)
-        response.raise_for_status()
+        responses.raise_for_status()
         logger.info(f"Sent message to Telegram chat {chat_id}: {message}")
     except requests.exceptions.RequestException as e:
         logger.error(f"Error sending message to Telegram: {e}")
@@ -167,18 +166,17 @@ def consume():
         try:
             logger.info("Attempting to receive messages from SQS...")
 
-            responses = sqs_client.receive_message(QueueUrl=SQS_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20)
-            logger.info(f"SQS response received: {response}")
+            responses = sqs_client.receive_message(QueueUrl=SQS_QUEUE_NAME, MaxNumberOfMessages=1, WaitTimeSeconds=20)
 
-            if 'Messages' in response:
-                message = json.loads(response['Messages'][0]['Body'])
-                receipt_handle = response['Messages'][0]['ReceiptHandle']
+            if 'Messages' in responses:
+                message = json.loads(responses['Messages'][0]['Body'])
+                receipt_handle = responses['Messages'][0]['ReceiptHandle']
 
                 # Log the message to inspect its contents
                 logger.info(f"Received SQS message: {message}")
 
                 # Extract values safely
-                prediction_id = response['Messages'][0]['MessageId']
+                prediction_id = responses['Messages'][0]['MessageId']
                 image_url = message.get('image_url')
                 chat_id = message.get('chat_id')
 
@@ -233,28 +231,31 @@ def consume():
                             'prediction_id': prediction_id,
                             'original_img_path': original_img_path,
                             'predicted_img_path': str(predicted_img_path),
-                            'labels': labels,
                             'chat_id': chat_id,
-                            'time': Decimal(str(time.time()))  # Store time as Decimal
+                            'object_counts': format_prediction_summary(labels)
                         }
 
                         store_prediction_in_dynamodb(prediction_summary)
-                        formatted_message = f"Prediction {prediction_id} results:\n" + format_prediction_summary(labels)
-                        notify_telegram(chat_id, formatted_message)
+                        notify_telegram(chat_id, prediction_summary['object_counts'])
                     else:
-                        logger.warning(f'No prediction summary file found for {prediction_id}')
+                        logger.error(f"Prediction summary file not found for {img_name}.")
 
                 except Exception as e:
-                    logger.error(f"Error processing prediction results: {e}")
+                    logger.error(f"Error processing prediction for {prediction_id}: {e}")
                     continue
 
-                sqs_client.delete_message(QueueUrl=SQS_URL, ReceiptHandle=receipt_handle)
+                finally:
+                    # Delete the message from the queue
+                    logger.info("Deleting message from SQS...")
+                    sqs_client.delete_message(QueueUrl=SQS_QUEUE_NAME, ReceiptHandle=receipt_handle)
+                    logger.info("Message deleted from SQS.")
             else:
-                logger.info("No messages in SQS queue, waiting...")
+                logger.info("No messages received. Retrying...")
 
         except Exception as e:
-            logger.error(f"Error in SQS consume loop: {e}")
-            time.sleep(10)  # Wait before retrying
+            logger.error(f"Error while consuming messages: {e}")
+            time.sleep(1)  # Wait a moment before retrying
 
 if __name__ == "__main__":
+    logger.info("Starting the Yolo5 service...")
     consume()

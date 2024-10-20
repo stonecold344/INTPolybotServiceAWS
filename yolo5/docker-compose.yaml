@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   yolo5:
@@ -11,6 +10,7 @@ services:
       DYNAMODB_TABLE: ${DYNAMODB_TABLE}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       SQS_URL: ${SQS_URL}
+      SQS_QUEUE_NAME: ${SQS_URL}
     volumes:
       - ./logs:/usr/src/app/logs
     restart: always

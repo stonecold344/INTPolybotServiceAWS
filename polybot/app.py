@@ -55,7 +55,7 @@ def get_yolo5_url():
     return None
 
 # Retrieve the Telegram token
-SECRET_ID = "Telegram-Secret-Bennyi23"
+SECRET_ID = "Telegram-Secret-Bennyi24"
 secrets = get_secret(SECRET_ID)
 TELEGRAM_TOKEN = secrets.get("Telegram-Secret-Bennyi")
 
